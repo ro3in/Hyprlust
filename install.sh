@@ -3,10 +3,10 @@
 # install.sh — Arch Linux installer for the Hyprlust dotfiles (fish edition)
 #
 # Upstream:  https://github.com/NischalDawadi/Hyprlust   (zsh)
-# This fork: https://github.com/ro3in/dotfiles            (fish)
+# This fork: https://github.com/ro3in/Hyprlust            (fish)
 #
 # Usage:
-#   bash -c "$(curl -fsSL https://raw.githubusercontent.com/ro3in/dotfiles/main/install.sh)"
+#   bash -c "$(curl -fsSL https://raw.githubusercontent.com/ro3in/Hyprlust/master/install.sh)"
 #
 # Or, after cloning:
 #   ./install.sh            # full install
