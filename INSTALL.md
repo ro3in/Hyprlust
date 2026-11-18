@@ -73,6 +73,13 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/ro3in/Hyprlust/master/in
   32-bit graphics libraries (Steam/Wine) are installed when the `multilib` repo
   is enabled, and silently skipped when it is not.
 
+- **VMs**: works, but slowly. VMware SVGA, virtio-gpu and QXL match no physical
+  vendor, so the installer falls back to Mesa's software renderer (`llvmpipe`):
+  it installs `mesa` + `libva-mesa-driver` if missing and enables
+  `WLR_RENDERER_ALLOW_SOFTWARE=1`. Expect a usable but sluggish desktop — this
+  is CPU rendering, not a GPU. For a smoother test, give the VM several cores
+  and enable 3D acceleration / virtio-gpu with `venus` if your hypervisor
+  supports it.
 - **Wallpapers** live in a separate 450 MB repo and are not downloaded
   automatically. `git clone --depth=1 https://github.com/NischalDawadi/Wallpapers ~/Pictures/wallpapers`
 - **Monitor config**: edit `~/.config/hypr/UserConfigs/Monitors.conf` before

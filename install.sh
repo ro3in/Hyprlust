@@ -141,8 +141,7 @@ _detect_gpu() {
 _detect_gpu
 
 if (( ${#GPU_VENDORS[@]} == 0 )); then
-    warn "Could not identify a GPU (no lspci, or a VM)."
-    warn "Skipping vendor-specific setup; a generic Wayland session should still work."
+    info "No physical GPU identified (VM or virtual display) — will use Mesa software rendering."
 elif (( ${#GPU_VENDORS[@]} > 1 )); then
     info "GPUs detected: ${GPU_VENDORS[*]} (hybrid). Primary guess: ${GPU_PRIMARY:-unknown}"
 else
@@ -675,7 +674,33 @@ if [[ -f "$ENV_CONF" ]] && ! grep -q 'hyprlust-gpu' "$ENV_CONF"; then
     fi
 fi
 
-# --- 12e. 32-bit graphics libs (Steam/Wine) ----------------------------------
+# --- 12e. Unknown / virtual GPU (VMs) ----------------------------------------
+# VMware SVGA, virtio-gpu, QXL and friends match no vendor above. Hyprland
+# still runs there, but only through Mesa's software renderer, and Mesa is
+# not otherwise pulled in — without this a fresh VM has no working GL at all.
+if (( ${#GPU_VENDORS[@]} == 0 )); then
+    if ! pacman -Qq mesa >/dev/null 2>&1; then
+        info "Virtual/unknown GPU — installing Mesa for software rendering..."
+        run sudo pacman -S --needed --noconfirm mesa libva-mesa-driver \
+            || warn "Mesa install failed — install 'mesa' before starting Hyprland."
+    else
+        ok "Mesa present (software rendering available)."
+    fi
+
+    # No hardware GL in a VM, so Hyprland must be allowed to fall back.
+    if [[ -f "$ENV_CONF" ]] && ! grep -qE '^env = WLR_RENDERER_ALLOW_SOFTWARE,' "$ENV_CONF"; then
+        if (( DRY_RUN )); then
+            printf '  + enable WLR_RENDERER_ALLOW_SOFTWARE in ENVariables.conf\n'
+        else
+            _add_env_if_missing "$ENV_CONF" "WLR_RENDERER_ALLOW_SOFTWARE,1" \
+                && ok "Enabled software rendering."
+        fi
+    fi
+
+    info "In a VM, expect a slow desktop — this is llvmpipe, not a GPU."
+fi
+
+# --- 12f. 32-bit graphics libs (Steam/Wine) ----------------------------------
 # Optional, but without these 32-bit games render through llvmpipe.
 if (( ${#GPU_VENDORS[@]} > 0 )) && ! pacman -Qq lib32-mesa >/dev/null 2>&1; then
     _lib32=()
