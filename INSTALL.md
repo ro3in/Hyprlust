@@ -7,13 +7,13 @@ from zsh to fish.
 ## Install
 
 ```bash
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/ro3in/dotfiles/main/install.sh)"
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/ro3in/Hyprlust/master/install.sh)"
 ```
 
 Preview what it will do without changing anything:
 
 ```bash
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/ro3in/dotfiles/main/install.sh)" -- --dry-run
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/ro3in/Hyprlust/master/install.sh)" -- --dry-run
 ```
 
 ## What it does
@@ -28,7 +28,9 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/ro3in/dotfiles/main/inst
 6. Repairs the broken absolute symlinks upstream ships.
 7. Adapts Hyprlust's `swww` calls to `awww`.
 8. Rewrites hardcoded `/home/hypr` paths to your `$HOME`.
-9. Enables NetworkManager and Bluetooth, offers to switch your shell to fish.
+9. Detects your GPU and installs/verifies the matching drivers (NVIDIA, AMD,
+   or Intel), including hybrid setups.
+10. Enables NetworkManager and Bluetooth, offers to switch your shell to fish.
 
 ## Differences from upstream
 
@@ -48,12 +50,29 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/ro3in/dotfiles/main/inst
 
 ## Notes
 
-- **NVIDIA**: handled automatically. On detection the installer verifies the
-  driver, checks that `nvidia_drm.modeset=1` is active, uncomments the relevant
-  environment variables in `ENVariables.conf`, and enables the suspend/resume
-  services. Reboot before your first Hyprland login. If modeset is off it tells
-  you the exact kernel parameter to add rather than quietly producing a black
-  screen.
+- **GPU support**: automatic, for all three vendors. The installer detects your
+  GPU(s) from `lspci` (falling back to `/sys/class/drm` in VMs) and configures
+  only the vendor actually present:
+
+  | GPU | What happens |
+  |---|---|
+  | **NVIDIA** | Verifies `nvidia-utils`, checks `nvidia_drm.modeset=1`, uncomments the GBM/GLX/`NVD_BACKEND` vars, enables the suspend/resume services |
+  | **AMD** | Installs `mesa vulkan-radeon libva-mesa-driver mesa-vdpau`, sets `AMD_VULKAN_ICD=RADV` |
+  | **Intel** | Installs `mesa vulkan-intel intel-media-driver`, sets `LIBVA_DRIVER_NAME=iHD` |
+
+  Hybrid laptops (AMD or Intel iGPU + NVIDIA discrete) are detected and handled
+  differently on purpose: the iGPU drives the panel, so the installer **does
+  not** apply NVIDIA's `GBM_BACKEND`/`__GLX_VENDOR_LIBRARY_NAME` variables —
+  doing so breaks compositing. Per-app offload stays available via
+  `__NV_PRIME_RENDER_OFFLOAD=1 <app>`. On Intel hybrids `LIBVA_DRIVER_NAME=iHD`
+  wins over `nvidia`, since the iGPU does the video decode.
+
+  If `nvidia_drm.modeset` is off, it prints the exact kernel parameter to add
+  rather than letting you reboot into a black screen.
+
+  32-bit graphics libraries (Steam/Wine) are installed when the `multilib` repo
+  is enabled, and silently skipped when it is not.
+
 - **Wallpapers** live in a separate 450 MB repo and are not downloaded
   automatically. `git clone --depth=1 https://github.com/NischalDawadi/Wallpapers ~/Pictures/wallpapers`
 - **Monitor config**: edit `~/.config/hypr/UserConfigs/Monitors.conf` before

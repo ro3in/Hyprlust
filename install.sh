@@ -93,10 +93,60 @@ trap '[[ -n "${SUDO_KEEPALIVE_PID:-}" ]] && kill "$SUDO_KEEPALIVE_PID" 2>/dev/nu
 info "Arch-based system detected: $(. /etc/os-release && printf '%s' "${PRETTY_NAME:-unknown}")"
 (( DRY_RUN )) && warn "DRY RUN — nothing will be installed or modified."
 
-# Detect NVIDIA early: Hyprland needs different env vars on Team Green.
-GPU_NVIDIA=0
-if command -v lspci >/dev/null && lspci 2>/dev/null | grep -qi 'nvidia'; then
-    GPU_NVIDIA=1
+# ---------------------------------------------------------------------------
+# 1b. GPU detection
+# ---------------------------------------------------------------------------
+# Hyprland needs different drivers and environment variables per vendor, and
+# the wrong env vars actively break rendering (e.g. GBM_BACKEND=nvidia-drm on
+# an AMD box). Detect what is actually present so this script is portable.
+GPU_VENDORS=()   # subset of: nvidia amd intel
+GPU_PRIMARY=""   # the GPU driving the display, if determinable
+
+_detect_gpu() {
+    local vga=""
+    if command -v lspci >/dev/null 2>&1; then
+        vga="$(lspci -nn 2>/dev/null | grep -Ei 'vga compatible|3d controller|display controller' || true)"
+    fi
+
+    # Fall back to DRM sysfs if lspci is unavailable (minimal installs).
+    if [[ -z "$vga" ]] && [[ -d /sys/class/drm ]]; then
+        for c in /sys/class/drm/card*/device/vendor; do
+            [[ -r "$c" ]] || continue
+            case "$(cat "$c")" in
+                0x10de) vga+=$'\n''nvidia' ;;
+                0x1002) vga+=$'\n''amd' ;;
+                0x8086) vga+=$'\n''intel' ;;
+            esac
+        done
+    fi
+
+    local lower; lower="$(printf '%s' "$vga" | tr '[:upper:]' '[:lower:]')"
+    [[ "$lower" == *nvidia* ]] && GPU_VENDORS+=(nvidia)
+    # 1002 = AMD/ATI, and "advanced micro devices" catches the full name.
+    [[ "$lower" == *amd* || "$lower" == *"advanced micro devices"* || "$lower" == *"[1002:"* ]] && GPU_VENDORS+=(amd)
+    [[ "$lower" == *intel* || "$lower" == *"[8086:"* ]] && GPU_VENDORS+=(intel)
+
+    # Pick the primary: the one Hyprland will render on. NVIDIA discrete is
+    # usually primary on desktops; on laptops the iGPU often is. This is a
+    # hint for choosing driver packages, never load-bearing.
+    if [[ " ${GPU_VENDORS[*]} " == *" nvidia "* ]]; then
+        GPU_PRIMARY="nvidia"
+    elif [[ " ${GPU_VENDORS[*]} " == *" amd "* ]]; then
+        GPU_PRIMARY="amd"
+    elif [[ " ${GPU_VENDORS[*]} " == *" intel "* ]]; then
+        GPU_PRIMARY="intel"
+    fi
+}
+
+_detect_gpu
+
+if (( ${#GPU_VENDORS[@]} == 0 )); then
+    warn "Could not identify a GPU (no lspci, or a VM)."
+    warn "Skipping vendor-specific setup; a generic Wayland session should still work."
+elif (( ${#GPU_VENDORS[@]} > 1 )); then
+    info "GPUs detected: ${GPU_VENDORS[*]} (hybrid). Primary guess: ${GPU_PRIMARY:-unknown}"
+else
+    info "GPU detected: ${GPU_VENDORS[0]}"
 fi
 
 # ---------------------------------------------------------------------------
@@ -458,30 +508,30 @@ run sudo systemctl enable --now NetworkManager.service
 run sudo systemctl enable --now bluetooth.service
 
 # ---------------------------------------------------------------------------
-# 12. NVIDIA support
+# 12. GPU setup (NVIDIA / AMD / Intel)
 # ---------------------------------------------------------------------------
-# Hyprland works on NVIDIA, but only if three things are true. Upstream ships
-# the env vars commented out and assumes you know to uncomment them, so a plain
-# install gives you a black screen or a laggy desktop. Handle it here.
-enable_nvidia_envs() {
-    local conf="$1"
+# Hyprland runs on all three vendors but needs different drivers and env vars.
+# Upstream ships NVIDIA's variables commented out and nothing for the others,
+# so a plain install is broken differently on each. This section configures
+# only the vendor(s) actually present — applying NVIDIA's GBM/GLX vars on an
+# AMD machine would break rendering, and vice versa.
+
+_has_vendor() {
+    [[ " ${GPU_VENDORS[*]:-} " == *" $1 "* ]]
+}
+
+# Uncomment the FIRST occurrence of an upstream-provided "env = KEY," line.
+# Only touches lines upstream already wrote; never invents values.
+_enable_env_lines() {
+    local conf="$1"; shift
     [[ -f "$conf" ]] || return 0
-
-    # Only touch lines that upstream left commented out, and only uncomment
-    # them — never invent new values.
-    local vars=(
-        WLR_NO_HARDWARE_CURSORS
-        LIBVA_DRIVER_NAME
-        __GLX_VENDOR_LIBRARY_NAME
-        GBM_BACKEND
-        NVD_BACKEND
-    )
-
-    local changed=0
-    for v in "${vars[@]}"; do
+    local changed=0 v
+    for v in "$@"; do
+        # Skip if already enabled. Upstream repeats some keys (NVD_BACKEND
+        # appears twice), so without this guard a second run would uncomment
+        # the duplicate.
+        grep -qE "^env = ${v}," "$conf" && continue
         if grep -qE "^#env = ${v}," "$conf"; then
-            # Only the first match: upstream duplicates a few of these lines
-            # and enabling both would create duplicate env entries.
             awk -v v="$v" '
                 !done && $0 ~ "^#env = " v "," { sub("^#env = ", "env = "); done=1 }
                 { print }
@@ -489,85 +539,154 @@ enable_nvidia_envs() {
             changed=1
         fi
     done
-    (( changed )) && ok "Enabled NVIDIA environment variables in ${conf#"$HOME"/}"
+    (( changed )) && ok "Enabled environment variables in ${conf#"$HOME"/}"
 }
 
-if (( GPU_NVIDIA )); then
-    info "NVIDIA GPU detected — configuring for Hyprland."
+# Append an "env = KEY,VALUE" line only if KEY is not already defined.
+_add_env_if_missing() {
+    local conf="$1" key="${2%%,*}" pair="$2"
+    [[ -f "$conf" ]] || return 1
+    grep -qE "^env = ${key}," "$conf" && return 1
+    printf 'env = %s\n' "$pair" >>"$conf"
+    return 0
+}
 
-    # --- 12a. Driver ---
-    # Pick the right package for the running kernel. -open is correct for
-    # Turing (GTX 16xx / RTX 20xx) and newer; -dkms follows kernel updates.
+ENV_CONF="$HOME/.config/hypr/UserConfigs/ENVariables.conf"
+
+# --- 12a. NVIDIA ------------------------------------------------------------
+if _has_vendor nvidia; then
+    info "Configuring NVIDIA..."
+
     if ! pacman -Qq nvidia-utils >/dev/null 2>&1; then
         warn "nvidia-utils is not installed."
-        if command -v pacman >/dev/null; then
-            # Prefer a kernel-matched module package if one is available.
+        # The open module is correct for Turing (GTX 16xx / RTX 20xx) and newer.
+        # Older cards (Maxwell/Pascal) still need the proprietary nvidia-dkms.
+        nv_pkg="nvidia-open-dkms"
+        if ! pacman -Si nvidia-open-dkms >/dev/null 2>&1; then
             nv_pkg="nvidia-dkms"
-            if pacman -Si nvidia-open-dkms >/dev/null 2>&1; then
-                nv_pkg="nvidia-open-dkms"
-            fi
-            info "Installing $nv_pkg nvidia-utils libva-nvidia-driver..."
-            run sudo pacman -S --needed --noconfirm "$nv_pkg" nvidia-utils libva-nvidia-driver \
-                || warn "NVIDIA driver install failed — install it manually before logging in."
         fi
+        info "Installing $nv_pkg nvidia-utils libva-nvidia-driver..."
+        run sudo pacman -S --needed --noconfirm "$nv_pkg" nvidia-utils libva-nvidia-driver \
+            || warn "NVIDIA driver install failed — install it before logging in."
     else
         _nvver="$(pacman -Q nvidia-utils 2>/dev/null | awk '{print $2}')"
         ok "NVIDIA driver present${_nvver:+ ($_nvver)}."
     fi
 
-    # --- 12b. KMS ---
-    # Hyprland needs nvidia_drm.modeset=1. Modern nvidia-utils defaults it to Y,
-    # but an explicit kernel parameter is what the Hyprland wiki recommends and
-    # it also works on older drivers. Warn only if it is actually off.
+    # Hyprland cannot start without modeset. Check it rather than assume.
     if [[ "$(cat /sys/module/nvidia_drm/parameters/modeset 2>/dev/null)" != "Y" ]]; then
         warn "nvidia_drm modeset is OFF — Hyprland will not start."
-        warn "Add this to your kernel command line, then reboot:"
+        warn "Add to your kernel command line, then reboot:"
         warn "  nvidia_drm.modeset=1 nvidia_drm.fbdev=1"
-        warn "For GRUB: edit /etc/default/grub, then run 'sudo grub-mkconfig -o /boot/grub/grub.cfg'"
-        warn "For systemd-boot / limine: use your bootloader's config editor."
     else
         ok "nvidia_drm modeset enabled."
     fi
 
-    # --- 12c. Environment variables ---
-    # Variable sets differ by driver era. Turing+ with the open driver needs
-    # very little; older cards need the GBM/GLX shims.
-    ENV_CONF="$HOME/.config/hypr/UserConfigs/ENVariables.conf"
-    enable_nvidia_envs "$ENV_CONF"
+    # On a hybrid AMD/Intel + NVIDIA laptop the iGPU usually drives the panel,
+    # so NVIDIA's GBM/GLX vars would break compositing. Only apply them when
+    # NVIDIA is the only GPU present.
+    if (( ${#GPU_VENDORS[@]} == 1 )); then
+        _enable_env_lines "$ENV_CONF" \
+            WLR_NO_HARDWARE_CURSORS LIBVA_DRIVER_NAME __GLX_VENDOR_LIBRARY_NAME \
+            GBM_BACKEND NVD_BACKEND
+    else
+        info "Hybrid graphics: leaving NVIDIA GBM/GLX vars off (iGPU drives the display)."
+        info "For per-app offload use: __NV_PRIME_RENDER_OFFLOAD=1 <app>"
+        # Hardware video decode still matters. Pick the driver for the GPU that
+        # actually drives the panel: on an Intel hybrid that is iHD (handled in
+        # the Intel block below), so only claim LIBVA here for AMD hybrids.
+        # WLR_NO_HARDWARE_CURSORS is harmless everywhere on hybrid.
+        if ! _has_vendor intel; then
+            _enable_env_lines "$ENV_CONF" LIBVA_DRIVER_NAME
+        fi
+        _enable_env_lines "$ENV_CONF" WLR_NO_HARDWARE_CURSORS
+    fi
 
-    # XDG_SESSION_TYPE is not in upstream's commented block at all, so add only
-    # what is genuinely missing instead of duplicating what was just enabled.
-    if [[ -f "$ENV_CONF" ]] && ! grep -q 'hyprlust-nvidia' "$ENV_CONF"; then
+    # Suspend/resume hooks prevent the classic wake-to-black-screen bug.
+    if pacman -Qq nvidia-utils >/dev/null 2>&1; then
+        run sudo systemctl enable --now nvidia-suspend.service \
+                nvidia-hibernate.service nvidia-resume.service 2>/dev/null \
+            || info "NVIDIA power services not present — skipping."
+    fi
+fi
+
+# --- 12b. AMD ---------------------------------------------------------------
+if _has_vendor amd; then
+    info "Configuring AMD..."
+
+    # mesa covers Radeon; vulkan-radeon is needed for Hyprland's renderer.
+    _amd_pkgs=(mesa vulkan-radeon libva-mesa-driver mesa-vdpau)
+    if ! pacman -Qq mesa >/dev/null 2>&1; then
+        info "Installing AMD userspace drivers..."
+        run sudo pacman -S --needed --noconfirm "${_amd_pkgs[@]}" \
+            || warn "AMD driver install failed — install mesa manually."
+    else
+        ok "Mesa already present."
+    fi
+
+    # RADV is the default Vulkan driver; this makes it explicit and avoids
+    # falling back to a software renderer on hybrid setups.
+    if ! grep -qE '^env = (AMD_VULKAN_ICD|VK_ICD_FILENAMES),' "$ENV_CONF" 2>/dev/null; then
         if (( DRY_RUN )); then
-            printf '  + append missing NVIDIA Wayland tweaks to ENVariables.conf\n'
+            printf '  + add AMD Vulkan hint to ENVariables.conf\n'
         else
-            _added=0
-            for pair in "XDG_SESSION_TYPE,wayland"; do
-                _key="${pair%%,*}"
-                grep -qE "^env = ${_key}," "$ENV_CONF" && continue
-                printf 'env = %s\n' "$pair" >>"$ENV_CONF"
-                _added=1
-            done
-            printf '# hyprlust-nvidia\n' >>"$ENV_CONF"
-            (( _added )) && ok "Added missing NVIDIA Wayland tweaks."
+            _add_env_if_missing "$ENV_CONF" "AMD_VULKAN_ICD,RADV" && ok "Set AMD_VULKAN_ICD=RADV."
         fi
     fi
 
-    # --- 12d. Powersave/resume hooks ---
-    # Without these, suspend often wakes to a black screen on NVIDIA.
-    if pacman -Qq nvidia-utils >/dev/null 2>&1; then
-        info "Enabling NVIDIA suspend/resume services..."
-        run sudo systemctl enable --now nvidia-suspend.service nvidia-hibernate.service \
-                nvidia-resume.service 2>/dev/null \
-            || info "NVIDIA power services not present — skipping (fine on most setups)."
+    ok "AMD setup done (no proprietary driver required)."
+fi
+
+# --- 12c. Intel -------------------------------------------------------------
+if _has_vendor intel; then
+    info "Configuring Intel..."
+
+    _intel_pkgs=(mesa vulkan-intel intel-media-driver libva-intel-driver)
+    if ! pacman -Qq mesa >/dev/null 2>&1; then
+        info "Installing Intel userspace drivers..."
+        run sudo pacman -S --needed --noconfirm "${_intel_pkgs[@]}" \
+            || warn "Intel driver install failed — install mesa manually."
+    else
+        ok "Mesa already present."
     fi
 
-    echo
-    info "NVIDIA setup summary:"
-    echo "    - Driver packages checked/installed."
-    echo "    - modeset verified."
-    echo "    - Environment variables enabled in ENVariables.conf."
-    echo "    - Reboot before starting Hyprland for the first time."
+    # Intel's VA-API driver must be selected explicitly on newer iGPUs, or
+    # hardware video decode silently falls back to the CPU.
+    if ! grep -qE '^env = LIBVA_DRIVER_NAME,' "$ENV_CONF" 2>/dev/null; then
+        if (( DRY_RUN )); then
+            printf '  + add LIBVA_DRIVER_NAME=iHD for Intel\n'
+        else
+            _add_env_if_missing "$ENV_CONF" "LIBVA_DRIVER_NAME,iHD" \
+                && ok "Set LIBVA_DRIVER_NAME=iHD."
+        fi
+    fi
+
+    ok "Intel setup done."
+fi
+
+# --- 12d. Session env shared by every vendor ---------------------------------
+# Upstream never defines this, and without it apps guess at the session type.
+if [[ -f "$ENV_CONF" ]] && ! grep -q 'hyprlust-gpu' "$ENV_CONF"; then
+    if (( DRY_RUN )); then
+        printf '  + ensure XDG_SESSION_TYPE=wayland in ENVariables.conf\n'
+    else
+        _add_env_if_missing "$ENV_CONF" "XDG_SESSION_TYPE,wayland" || true
+        printf '# hyprlust-gpu (%s)\n' "${GPU_PRIMARY:-unknown}" >>"$ENV_CONF"
+    fi
+fi
+
+# --- 12e. 32-bit graphics libs (Steam/Wine) ----------------------------------
+# Optional, but without these 32-bit games render through llvmpipe.
+if (( ${#GPU_VENDORS[@]} > 0 )) && ! pacman -Qq lib32-mesa >/dev/null 2>&1; then
+    _lib32=()
+    _has_vendor nvidia && _lib32+=(lib32-nvidia-utils)
+    _has_vendor amd    && _lib32+=(lib32-vulkan-radeon)
+    _has_vendor intel  && _lib32+=(lib32-vulkan-intel)
+    if (( ${#_lib32[@]} > 0 )); then
+        info "Installing 32-bit graphics libs (for Steam/Wine)..."
+        run sudo pacman -S --needed --noconfirm lib32-mesa "${_lib32[@]}" \
+            || info "32-bit libs skipped (multilib may be disabled — that's fine)."
+    fi
 fi
 
 # ---------------------------------------------------------------------------
