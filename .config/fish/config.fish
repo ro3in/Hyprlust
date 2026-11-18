@@ -15,7 +15,10 @@ set -gx FREETYPE_PROPERTIES "truetype:interpreter-version=35 autofitter:no-stem-
 
 # Unified PATH. The original .zshrc hardcoded /home/hypr/*; use $HOME instead
 # so this works on every machine.
-fish_add_path --global --move-to-front \
+# NOTE: the flag is --move (m), not --move-to-front. fish 4 dropped the old
+# spelling, and an unknown option here aborts the whole file — which silently
+# disables every later line in config.fish.
+fish_add_path --global --move \
     $HOME/bin \
     $HOME/.local/bin \
     $HOME/.cargo/bin \
