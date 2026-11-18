@@ -273,13 +273,32 @@ fi
 
 if [[ -n "$AUR_HELPER" ]]; then
     info "Installing AUR packages with $AUR_HELPER..."
+    # Both helpers ask interactive questions even with --noconfirm: whether to
+    # clean the build dir, show PKGBUILD diffs, and so on. Left unanswered they
+    # block forever. Each helper needs its own flag names, and stdin is
+    # redirected from /dev/null so a surprise prompt cannot hang the install.
+    _aur_opts=()
+    case "$AUR_HELPER" in
+        yay)  _aur_opts=(--answerclean None --answerdiff None) ;;
+        paru) _aur_opts=(--skipreview --batchinstall) ;;
+    esac
+
     for pkg in "${AUR_PKGS[@]}"; do
-        if run "$AUR_HELPER" -S --needed --noconfirm "$pkg"; then
+        if run "$AUR_HELPER" -S --needed --noconfirm "${_aur_opts[@]}" "$pkg" < /dev/null; then
             :
         else
             warn "AUR package '$pkg' failed — continuing without it."
         fi
     done
+
+    # wallust is a large Rust build (~260 crates) and is the one AUR package
+    # most likely to be killed on a small VM. It only drives colour theming,
+    # so the desktop is usable without it.
+    if ! command -v wallust >/dev/null; then
+        warn "wallust is missing — wallpaper-driven recolouring will not work."
+        warn "Hyprlust ships a default palette, so colours still render."
+        warn "Install it later with:  yay -S wallust"
+    fi
 fi
 
 # ---------------------------------------------------------------------------
@@ -463,8 +482,9 @@ if command -v awww >/dev/null && ! command -v swww >/dev/null; then
         done < <(grep -rlZ --binary-files=without-match 'swww' \
                     "$HOME/.config/hypr/scripts" \
                     "$HOME/.config/hypr/UserScripts" \
+                    "$HOME/.config/hypr/UserConfigs" \
                     "$HOME/.config/hypr/initial-boot.sh" 2>/dev/null || true)
-        (( _patched > 0 )) && ok "Patched $_patched script(s) to use awww."
+        (( _patched > 0 )) && ok "Patched $_patched file(s) to use awww."
 
         # WallustSwww.sh hardcodes the old cache path. awww stores images under
         # ~/.cache/awww/<version>/<output>, so teach the script to descend into
@@ -483,6 +503,38 @@ if command -v awww >/dev/null && ! command -v swww >/dev/null; then
                 ok "Taught WallustSwww.sh to find awww's cache directory."
             fi
         fi
+    fi
+fi
+
+# The wallpaper daemon is started by initial-boot.sh (first login) and by
+# Startup_Apps.conf. If the config still says `swww` while only `awww` is
+# installed, nothing ever starts the daemon and Hyprland comes up with a black
+# background. Verify here in case the patch above somehow missed it.
+_STARTUP="$HOME/.config/hypr/UserConfigs/Startup_Apps.conf"
+if command -v awww >/dev/null && ! command -v swww >/dev/null && [[ -f "$_STARTUP" ]]; then
+    if grep -q '\bswww\b' "$_STARTUP"; then
+        if (( DRY_RUN )); then
+            printf '  + swww still referenced in Startup_Apps.conf; would rewrite to awww\n'
+        else
+            sed -i -e 's/swww-daemon/awww-daemon/g' \
+                   -e 's/swww img -o /awww img --output /g' \
+                   -e 's/\bswww\b/awww/g' \
+                   "$_STARTUP"
+            ok "Rewrote remaining swww references in Startup_Apps.conf."
+        fi
+    fi
+fi
+
+# ags is deliberately not installed (Aylur's GTK Shell): upstream's
+# "exec-once = ags &" is a leftover from an earlier bar setup, and the AUR
+# package named `ags` is an unrelated adventure-game engine. Comment the line
+# out so every login does not spawn a command that can never exist.
+if [[ -f "$_STARTUP" ]] && grep -qE '^exec-once = ags &' "$_STARTUP"; then
+    if (( DRY_RUN )); then
+        printf '  + disable the leftover "exec-once = ags" line\n'
+    else
+        sed -i 's|^exec-once = ags &|#exec-once = ags \&  # hyprlust: not installed|' "$_STARTUP"
+        ok "Disabled the leftover ags startup line."
     fi
 fi
 
