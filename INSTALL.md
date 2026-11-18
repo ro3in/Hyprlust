@@ -48,9 +48,12 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/ro3in/dotfiles/main/inst
 
 ## Notes
 
-- **NVIDIA**: the installer detects your GPU and prints what to do. Install
-  `nvidia-dkms nvidia-utils libva-nvidia-driver`, then uncomment the NVIDIA
-  block in `~/.config/hypr/UserConfigs/ENVariables.conf`.
+- **NVIDIA**: handled automatically. On detection the installer verifies the
+  driver, checks that `nvidia_drm.modeset=1` is active, uncomments the relevant
+  environment variables in `ENVariables.conf`, and enables the suspend/resume
+  services. Reboot before your first Hyprland login. If modeset is off it tells
+  you the exact kernel parameter to add rather than quietly producing a black
+  screen.
 - **Wallpapers** live in a separate 450 MB repo and are not downloaded
   automatically. `git clone --depth=1 https://github.com/NischalDawadi/Wallpapers ~/Pictures/wallpapers`
 - **Monitor config**: edit `~/.config/hypr/UserConfigs/Monitors.conf` before

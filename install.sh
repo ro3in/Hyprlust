@@ -458,15 +458,116 @@ run sudo systemctl enable --now NetworkManager.service
 run sudo systemctl enable --now bluetooth.service
 
 # ---------------------------------------------------------------------------
-# 12. NVIDIA hint
+# 12. NVIDIA support
 # ---------------------------------------------------------------------------
+# Hyprland works on NVIDIA, but only if three things are true. Upstream ships
+# the env vars commented out and assumes you know to uncomment them, so a plain
+# install gives you a black screen or a laggy desktop. Handle it here.
+enable_nvidia_envs() {
+    local conf="$1"
+    [[ -f "$conf" ]] || return 0
+
+    # Only touch lines that upstream left commented out, and only uncomment
+    # them — never invent new values.
+    local vars=(
+        WLR_NO_HARDWARE_CURSORS
+        LIBVA_DRIVER_NAME
+        __GLX_VENDOR_LIBRARY_NAME
+        GBM_BACKEND
+        NVD_BACKEND
+    )
+
+    local changed=0
+    for v in "${vars[@]}"; do
+        if grep -qE "^#env = ${v}," "$conf"; then
+            # Only the first match: upstream duplicates a few of these lines
+            # and enabling both would create duplicate env entries.
+            awk -v v="$v" '
+                !done && $0 ~ "^#env = " v "," { sub("^#env = ", "env = "); done=1 }
+                { print }
+            ' "$conf" > "$conf.tmp" && mv "$conf.tmp" "$conf"
+            changed=1
+        fi
+    done
+    (( changed )) && ok "Enabled NVIDIA environment variables in ${conf#"$HOME"/}"
+}
+
 if (( GPU_NVIDIA )); then
-    warn "NVIDIA GPU detected."
-    warn "Hyprlust's ENVariables.conf already carries the standard NVIDIA"
-    warn "variables but leaves them commented out. Before your first login,"
-    warn "install the driver and enable those lines:"
-    warn "  sudo pacman -S --needed nvidia-dkms nvidia-utils libva-nvidia-driver"
-    warn "  \$EDITOR ~/.config/hypr/UserConfigs/ENVariables.conf"
+    info "NVIDIA GPU detected — configuring for Hyprland."
+
+    # --- 12a. Driver ---
+    # Pick the right package for the running kernel. -open is correct for
+    # Turing (GTX 16xx / RTX 20xx) and newer; -dkms follows kernel updates.
+    if ! pacman -Qq nvidia-utils >/dev/null 2>&1; then
+        warn "nvidia-utils is not installed."
+        if command -v pacman >/dev/null; then
+            # Prefer a kernel-matched module package if one is available.
+            nv_pkg="nvidia-dkms"
+            if pacman -Si nvidia-open-dkms >/dev/null 2>&1; then
+                nv_pkg="nvidia-open-dkms"
+            fi
+            info "Installing $nv_pkg nvidia-utils libva-nvidia-driver..."
+            run sudo pacman -S --needed --noconfirm "$nv_pkg" nvidia-utils libva-nvidia-driver \
+                || warn "NVIDIA driver install failed — install it manually before logging in."
+        fi
+    else
+        _nvver="$(pacman -Q nvidia-utils 2>/dev/null | awk '{print $2}')"
+        ok "NVIDIA driver present${_nvver:+ ($_nvver)}."
+    fi
+
+    # --- 12b. KMS ---
+    # Hyprland needs nvidia_drm.modeset=1. Modern nvidia-utils defaults it to Y,
+    # but an explicit kernel parameter is what the Hyprland wiki recommends and
+    # it also works on older drivers. Warn only if it is actually off.
+    if [[ "$(cat /sys/module/nvidia_drm/parameters/modeset 2>/dev/null)" != "Y" ]]; then
+        warn "nvidia_drm modeset is OFF — Hyprland will not start."
+        warn "Add this to your kernel command line, then reboot:"
+        warn "  nvidia_drm.modeset=1 nvidia_drm.fbdev=1"
+        warn "For GRUB: edit /etc/default/grub, then run 'sudo grub-mkconfig -o /boot/grub/grub.cfg'"
+        warn "For systemd-boot / limine: use your bootloader's config editor."
+    else
+        ok "nvidia_drm modeset enabled."
+    fi
+
+    # --- 12c. Environment variables ---
+    # Variable sets differ by driver era. Turing+ with the open driver needs
+    # very little; older cards need the GBM/GLX shims.
+    ENV_CONF="$HOME/.config/hypr/UserConfigs/ENVariables.conf"
+    enable_nvidia_envs "$ENV_CONF"
+
+    # XDG_SESSION_TYPE is not in upstream's commented block at all, so add only
+    # what is genuinely missing instead of duplicating what was just enabled.
+    if [[ -f "$ENV_CONF" ]] && ! grep -q 'hyprlust-nvidia' "$ENV_CONF"; then
+        if (( DRY_RUN )); then
+            printf '  + append missing NVIDIA Wayland tweaks to ENVariables.conf\n'
+        else
+            _added=0
+            for pair in "XDG_SESSION_TYPE,wayland"; do
+                _key="${pair%%,*}"
+                grep -qE "^env = ${_key}," "$ENV_CONF" && continue
+                printf 'env = %s\n' "$pair" >>"$ENV_CONF"
+                _added=1
+            done
+            printf '# hyprlust-nvidia\n' >>"$ENV_CONF"
+            (( _added )) && ok "Added missing NVIDIA Wayland tweaks."
+        fi
+    fi
+
+    # --- 12d. Powersave/resume hooks ---
+    # Without these, suspend often wakes to a black screen on NVIDIA.
+    if pacman -Qq nvidia-utils >/dev/null 2>&1; then
+        info "Enabling NVIDIA suspend/resume services..."
+        run sudo systemctl enable --now nvidia-suspend.service nvidia-hibernate.service \
+                nvidia-resume.service 2>/dev/null \
+            || info "NVIDIA power services not present — skipping (fine on most setups)."
+    fi
+
+    echo
+    info "NVIDIA setup summary:"
+    echo "    - Driver packages checked/installed."
+    echo "    - modeset verified."
+    echo "    - Environment variables enabled in ENVariables.conf."
+    echo "    - Reboot before starting Hyprland for the first time."
 fi
 
 # ---------------------------------------------------------------------------
