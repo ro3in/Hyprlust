@@ -168,7 +168,10 @@ PACMAN_PKGS=(
     grim slurp swappy wl-clipboard cliphist
 
     # --- Audio / media / brightness ---
-    pipewire pipewire-alsa pipewire-pulse pipewire-jack wireplumber
+    # NOTE: pipewire-jack CONFLICTS WITH jack2. With --noconfirm pacman answers
+    # "no" to the "remove jack2?" prompt and aborts the ENTIRE transaction, so
+    # nothing gets installed. Handle the swap explicitly instead (see below).
+    pipewire pipewire-alsa pipewire-pulse wireplumber
     pamixer pavucontrol playerctl brightnessctl
     mpd mpc rmpc cava
 
@@ -208,7 +211,40 @@ AUR_PKGS=(
 )
 
 info "Installing packages from the official repos..."
-run sudo pacman -Syu --needed --noconfirm "${PACMAN_PKGS[@]}"
+
+# pipewire-jack conflicts with jack2, which is commonly already installed
+# (cava, ffmpeg, mpv, waybar and others pull it in). Under --noconfirm pacman
+# answers "no" to the "remove jack2?" prompt and aborts the ENTIRE
+# transaction, so nothing gets installed at all. Rather than ripping out the
+# user's audio stack, keep whichever JACK provider is already present and only
+# add pipewire-jack on systems that have none.
+if pacman -Qq jack2 >/dev/null 2>&1 || pacman -Qq jack >/dev/null 2>&1; then
+    info "A JACK provider is already installed — keeping it, skipping pipewire-jack."
+else
+    PACMAN_PKGS+=(pipewire-jack)
+fi
+
+# Split the transaction so one bad package cannot sink the whole install.
+# Anything that fails is collected and reported at the end instead of
+# silently killing the script under 'set -e'.
+FAILED_PKGS=()
+if (( DRY_RUN )); then
+    run sudo pacman -Syu --needed --noconfirm "${PACMAN_PKGS[@]}"
+else
+    if ! sudo pacman -Syu --needed --noconfirm "${PACMAN_PKGS[@]}"; then
+        warn "Bulk install failed — retrying package by package to isolate problems..."
+        for pkg in "${PACMAN_PKGS[@]}"; do
+            sudo pacman -S --needed --noconfirm "$pkg" >/dev/null 2>&1 \
+                || FAILED_PKGS+=("$pkg")
+        done
+    fi
+fi
+
+if (( ${#FAILED_PKGS[@]} > 0 )); then
+    warn "These packages could not be installed:"
+    printf '        %s\n' "${FAILED_PKGS[@]}"
+    warn "The desktop may be missing features. Re-run this script after fixing them."
+fi
 ok "Official packages installed."
 
 # --- AUR helper -------------------------------------------------------------
