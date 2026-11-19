@@ -20,17 +20,55 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/ro3in/Hyprlust/master/in
 
 1. Checks you are a normal user on an Arch-based system with `sudo`.
 2. Installs the official-repo packages Hyprlust actually needs.
-3. Installs an AUR helper (yay) if you have neither yay nor paru, then the
+3. Installs your own app list from [`apps.list`](apps.list).
+4. Installs an AUR helper (yay) if you have neither yay nor paru, then the
    optional AUR packages (pyprland, wallust, wlogout, …).
-4. Clones upstream Hyprlust and this repo.
-5. Deploys `config.fish` plus the desktop configs, backing up anything it
+5. Clones upstream Hyprlust and this repo.
+6. Deploys `config.fish` plus the desktop configs, backing up anything it
    replaces to `~/.config-backup-<timestamp>/`.
-6. Repairs the broken absolute symlinks upstream ships.
-7. Adapts Hyprlust's `swww` calls to `awww`.
-8. Rewrites hardcoded `/home/hypr` paths to your `$HOME`.
-9. Detects your GPU and installs/verifies the matching drivers (NVIDIA, AMD,
-   or Intel), including hybrid setups.
-10. Enables NetworkManager and Bluetooth, offers to switch your shell to fish.
+7. Repairs the broken absolute symlinks upstream ships.
+8. Adapts Hyprlust's `swww` calls to `awww`.
+9. Rewrites hardcoded `/home/hypr` paths to your `$HOME`.
+10. Detects your GPU and installs/verifies the matching drivers (NVIDIA, AMD,
+    or Intel), including hybrid setups.
+11. Enables NetworkManager and Bluetooth, offers to switch your shell to fish.
+
+## Your own apps: `apps.list`
+
+Everything you want on **every** machine lives in one editable file at the repo
+root: [`apps.list`](apps.list). Delete the lines you don't want, add the ones
+you do, then run the installer.
+
+```
+kitty                 # from the official repos
+aur:vm-curator        # AUR only — prefix with "aur:"
+```
+
+- `#` starts a comment, blank lines are ignored.
+- Names are plain package names, one per line.
+- **Do not** add kernels, GPU drivers, bootloader or LUKS packages. The
+  installer detects the GPU itself, and boot/disk setup differs per machine.
+- Anything already in Hyprlust's own list is not installed twice.
+
+The list is read on a first run too: the installer fetches just that one small
+file from the repo when the checkout isn't on disk yet.
+
+### Bundled app configs
+
+These configs are deployed to `~/.config/` along with the desktop:
+
+| App | Config |
+|---|---|
+| `alacritty` | `alacritty/` (theme + keybinds) |
+| `micro` | `micro/` (catppuccin + syntax files) |
+| `qimgv` | `qimgv/` |
+| `easyeffects` | `easyeffects/` (EQ / effects chains) |
+| `vm-curator` | `vm-curator/` (`__HOME__` is expanded on install) |
+
+Deliberately **not** bundled: browser profiles (`helium`, `chrome`, `firefox`),
+`~/.config/opencode` (holds API keys), Spotify/Spicetify state, and any
+`~/.local/share` app data. Those are per-machine state, not configuration.
+
 
 ## Differences from upstream
 

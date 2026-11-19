@@ -1,0 +1,138 @@
+# ===========================================================================
+#  apps.list — the apps you want on every machine
+# ===========================================================================
+#  Edit this file, delete the lines you don't want, then run install.sh.
+#  One package per line. `#` starts a comment. Blank lines are ignored.
+#
+#  Prefix a line with `aur:` if the package only exists in the AUR.
+#  Everything else is expected from the official repos.
+#
+#  Deliberately NOT included (they break machines or are per-machine):
+#    - kernels, GPU drivers, firmware  -> install.sh detects the GPU itself
+#    - bootloader, LUKS, btrfs/snapper -> these fit one machine, not all
+#    - CachyOS-only meta packages      -> they would break plain Arch
+#    - laptop/desktop specific bits    -> MicroCode, power tuning, etc.
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# Terminals
+# ---------------------------------------------------------------------------
+kitty                     # Hyprlust's terminal (SUPER+Return / SUPER+T)
+alacritty                 # your second terminal, config bundled
+
+# ---------------------------------------------------------------------------
+# Files, images, media
+# ---------------------------------------------------------------------------
+nautilus                  # GNOME file manager (your config bundled)
+dolphin                   # KDE file manager
+qimgv-git                 # image viewer, your config bundled
+imv                       # fast Wayland image viewer
+meld                      # diff / merge tool
+mpv                       # video player
+vlc-plugins-all           # VLC codecs
+ffmpegthumbnailer         # video thumbnails in the file managers
+poppler-glib              # PDF thumbnails
+libopenraw                # RAW camera thumbnails
+libgsf                    # document thumbnails
+
+# ---------------------------------------------------------------------------
+# Browsers
+# ---------------------------------------------------------------------------
+helium-browser-bin        # your main browser (SUPER+H)
+aur:google-chrome         # SUPER+B and SUPER+G use google-chrome-stable
+aur:spotify               # music streaming
+aur:spotify-adblock       # removes Spotify ads
+
+# ---------------------------------------------------------------------------
+# Communication / remote
+# ---------------------------------------------------------------------------
+aur:localsend             # send files to your phone
+aur:nomachine             # remote desktop (what you reach your boxes with)
+aur:teamviewer            # remote support
+gnome-calendar            # calendar
+
+# ---------------------------------------------------------------------------
+# Audio
+# ---------------------------------------------------------------------------
+easyeffects               # your EQ / effects chain, config bundled
+pavucontrol               # per-app volume mixer
+pamixer                   # CLI volume, used by Hyprlust's Volume.sh
+playerctl                 # media key control
+cava                      # audio visualizer in the bar
+lsp-plugins-lv2           # LV2 effects for easyeffects
+
+# ---------------------------------------------------------------------------
+# Notifications, clipboard, screenshots
+# ---------------------------------------------------------------------------
+swaync                    # notification daemon + control center (SUPER+N)
+cliphist                  # clipboard history (SUPER+V)
+grim                      # screenshot region select
+slurp                     # region selection for grim
+wf-recorder               # screen recording (SUPER+SHIFT+R)
+wtype                     # simulates typing on Wayland
+hyprsunset                # night light / blue light filter
+
+# ---------------------------------------------------------------------------
+# Dev / CLI tools
+# ---------------------------------------------------------------------------
+neovim                    # your editor (LazyVim, config bundled)
+micro                     # easy editor, config bundled
+ripgrep                   # fast search (fzf/nvim)
+btop                      # resource monitor, config bundled
+fastfetch                 # system info on terminal open
+glances                   # system monitor
+duf                       # disk usage
+plocate                   # fast file locate
+unrar                     # rar archives
+openssh                   # ssh client + server
+rsync                     # sync/backup
+python                    # scripting
+git                       # version control
+
+# ---------------------------------------------------------------------------
+# VM / emulation
+# ---------------------------------------------------------------------------
+qemu-full
+libvirt
+virt-manager
+edk2-ovmf                 # UEFI firmware for VMs
+dnsmasq                   # libvirt's DHCP/DNS
+openbsd-netcat
+swtpm                     # TPM emulation
+aur:vm-curator            # your QEMU TUI, config bundled
+aur:bottles               # Wine/proton prefix manager
+
+# ---------------------------------------------------------------------------
+# Other apps you use
+# ---------------------------------------------------------------------------
+aur:antigravity           # Google Antigravity
+aur:limusic-bin           # YouTube Music client
+aur:omniroute-bin         # OmniRoute desktop app
+mission-center            # system monitor GUI (CTRL+SHIFT+Escape)
+
+# ---------------------------------------------------------------------------
+# Fonts / icons (the rices reference these by name)
+# ---------------------------------------------------------------------------
+ttf-jetbrains-mono-nerd
+ttf-nerd-fonts-symbols
+otf-font-awesome
+inter-font
+noto-fonts
+noto-fonts-emoji
+noto-fonts-cjk
+ttf-dejavu
+ttf-liberation
+papirus-icon-theme
+gnome-themes-extra
+
+# ---------------------------------------------------------------------------
+# Shell / prompt
+# ---------------------------------------------------------------------------
+fish
+fisher
+starship                  # prompt
+fzf
+zoxide                    # smart cd
+eza                       # ls replacement
+bat
+yazi                      # terminal file manager

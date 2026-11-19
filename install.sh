@@ -227,6 +227,58 @@ fi
 # Split the transaction so one bad package cannot sink the whole install.
 # Anything that fails is collected and reported at the end instead of
 # silently killing the script under 'set -e'.
+
+# ---------------------------------------------------------------------------
+# Personal apps from apps.list
+# ---------------------------------------------------------------------------
+# apps.list lives in the repo, so it is only readable after the clone. Read it
+# here if the repo is already on disk (a re-run), otherwise it is read again
+# after the clone step below. Lines look like:
+#     kitty            # repo package
+#     aur:vm-curator   # AUR only
+read_apps_list() {
+    local list="$REPO_DIR/apps.list"
+    if [[ ! -f "$list" ]]; then
+        # First run: the repo is cloned later in the script, so pull just this
+        # one small file now. If that fails we simply skip the personal apps
+        # rather than aborting the whole install.
+        local url="${REPO_URL%.git}/raw/master/apps.list"
+        if command -v curl >/dev/null 2>&1; then
+            curl -fsSL --max-time 15 "$url" -o "${TMPDIR:-/tmp}/hyprlust-apps.list" 2>/dev/null \
+                && list="${TMPDIR:-/tmp}/hyprlust-apps.list"
+        fi
+    fi
+    [[ -f "$list" ]] || return 0
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        line="${line%%#*}"                 # strip trailing comments
+        line="${line//[[:space:]]/}"       # strip all whitespace
+        [[ -z "$line" ]] && continue
+        if [[ "$line" == aur:* ]]; then
+            EXTRA_AUR_PKGS+=("${line#aur:}")
+        else
+            EXTRA_PACMAN_PKGS+=("$line")
+        fi
+    done < "$list"
+}
+
+EXTRA_PACMAN_PKGS=()
+EXTRA_AUR_PKGS=()
+read_apps_list
+
+if (( ${#EXTRA_PACMAN_PKGS[@]} > 0 )); then
+    info "Adding ${#EXTRA_PACMAN_PKGS[@]} app(s) from apps.list to the repo packages."
+    # De-duplicate: Hyprlust's own list wins, extras only add to it.
+    for pkg in "${EXTRA_PACMAN_PKGS[@]}"; do
+        [[ " ${PACMAN_PKGS[*]} " == *" $pkg "* ]] || PACMAN_PKGS+=("$pkg")
+    done
+fi
+if (( ${#EXTRA_AUR_PKGS[@]} > 0 )); then
+    info "Adding ${#EXTRA_AUR_PKGS[@]} AUR app(s) from apps.list."
+    for pkg in "${EXTRA_AUR_PKGS[@]}"; do
+        [[ " ${AUR_PKGS[*]} " == *" $pkg "* ]] || AUR_PKGS+=("$pkg")
+    done
+fi
+
 FAILED_PKGS=()
 if (( DRY_RUN )); then
     run sudo pacman -Syu --needed --noconfirm "${PACMAN_PKGS[@]}"
@@ -395,6 +447,8 @@ CONFIG_ITEMS=(
     btop fastfetch cava starship.toml
     # Optional extras — deployed only if you have the apps installed.
     mpd rmpc mpv nvim yazi zathura swappy wallust matugen
+    # Personal app configs (bundled with the fork).
+    alacritty micro qimgv easyeffects vm-curator
 )
 
 # pyprland reads ~/.config/pypr/config.toml and warns at startup about the
@@ -426,6 +480,15 @@ backup_and_place() {
         run mv "$dest" "$BACKUP_DIR/${dest#"$HOME"/}"
     fi
     run cp -a "$src" "$dest"
+    # Some configs carry a placeholder instead of a hardcoded home directory
+    # (vm-curator, for one). Expand it to this machine's real $HOME.
+    if [[ -d "$dest" ]] && ! (( DRY_RUN )); then
+        if grep -rqI "__HOME__" "$dest" 2>/dev/null; then
+            grep -rlI "__HOME__" "$dest" 2>/dev/null | while IFS= read -r f; do
+                sed -i "s|__HOME__|$HOME|g" "$f"
+            done
+        fi
+    fi
 }
 
 info "Deploying desktop configs (existing ones go to $BACKUP_DIR)..."

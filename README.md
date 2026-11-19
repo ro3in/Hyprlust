@@ -31,4 +31,7 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/ro3in/Hyprlust/master/in
 ```
 
 Preview without changing anything: add `-- --dry-run` to the command above.
+
+**Your apps:** [apps.list](apps.list) at the repo root is the list of extra
+packages installed on every machine. Edit it, then re-run the installer.
 See [INSTALL.md](INSTALL.md) for requirements and notes.
