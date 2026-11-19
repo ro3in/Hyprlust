@@ -18,7 +18,6 @@
 # Terminals
 # ---------------------------------------------------------------------------
 kitty                     # Hyprlust's terminal (SUPER+Return / SUPER+T)
-alacritty                 # your second terminal, config bundled
 
 # ---------------------------------------------------------------------------
 # Files, images, media
@@ -47,8 +46,6 @@ aur:spotify-adblock       # removes Spotify ads
 # Communication / remote
 # ---------------------------------------------------------------------------
 aur:localsend             # send files to your phone
-aur:nomachine             # remote desktop (what you reach your boxes with)
-aur:teamviewer            # remote support
 gnome-calendar            # calendar
 
 # ---------------------------------------------------------------------------
@@ -105,9 +102,7 @@ aur:bottles               # Wine/proton prefix manager
 # ---------------------------------------------------------------------------
 # Other apps you use
 # ---------------------------------------------------------------------------
-aur:antigravity           # Google Antigravity
 aur:limusic-bin           # YouTube Music client
-aur:omniroute-bin         # OmniRoute desktop app
 mission-center            # system monitor GUI (CTRL+SHIFT+Escape)
 
 # ---------------------------------------------------------------------------

@@ -448,7 +448,7 @@ CONFIG_ITEMS=(
     # Optional extras — deployed only if you have the apps installed.
     mpd rmpc mpv nvim yazi zathura swappy wallust matugen
     # Personal app configs (bundled with the fork).
-    alacritty micro qimgv easyeffects vm-curator
+    micro qimgv easyeffects vm-curator
 )
 
 # pyprland reads ~/.config/pypr/config.toml and warns at startup about the
