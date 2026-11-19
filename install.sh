@@ -397,6 +397,28 @@ CONFIG_ITEMS=(
     mpd rmpc mpv nvim yazi zathura swappy wallust matugen
 )
 
+# pyprland reads ~/.config/pypr/config.toml and warns at startup about the
+# legacy ~/.config/hypr/pyprland.toml location. Upstream ships the file under
+# hypr/, so place it where the daemon actually looks.
+deploy_pypr_config() {
+    local src="$REPO_DIR/.config/hypr/pyprland.toml"
+    local dest_dir="$HOME/.config/pypr"
+    local dest="$dest_dir/config.toml"
+    [[ -f "$src" ]] || return 0
+
+    if (( DRY_RUN )); then
+        printf '  + place pyprland config at ~/.config/pypr/config.toml\n'
+        return 0
+    fi
+    mkdir -p "$dest_dir"
+    if [[ -f "$dest" ]] && ! cmp -s "$src" "$dest"; then
+        mkdir -p "$BACKUP_DIR/.config/pypr"
+        run cp -a "$dest" "$BACKUP_DIR/.config/pypr/config.toml"
+    fi
+    run cp -a "$src" "$dest"
+    ok "Placed pyprland config at ~/.config/pypr/config.toml."
+}
+
 backup_and_place() {
     local src="$1" dest="$2"
     if [[ -e "$dest" || -L "$dest" ]]; then
@@ -412,6 +434,7 @@ for item in "${CONFIG_ITEMS[@]}"; do
     [[ -e "$src" ]] || continue
     backup_and_place "$src" "$HOME/.config/$item"
 done
+deploy_pypr_config
 
 # ---------------------------------------------------------------------------
 # 5b. Hyprland config format: .lua for 0.57+, .conf for older
@@ -519,12 +542,13 @@ if command -v awww >/dev/null && ! command -v swww >/dev/null; then
     else
         _patched=0
         while IFS= read -r -d '' f; do
-            # Order matters: handle the daemon name and the short -o flag
-            # before the catch-all rename.
+            # `-o` is the short form of `--outputs` and works unchanged in
+            # awww, so a plain rename is enough. Do NOT "expand" it to
+            # `--output` — that flag does not exist and every wallpaper
+            # command would fail with "unexpected argument '--output'".
             if grep -qE '\bswww\b|swww-daemon' "$f"; then
                 sed -i \
                     -e 's/swww-daemon/awww-daemon/g' \
-                    -e 's/swww img -o /awww img --output /g' \
                     -e 's/\bswww\b/awww/g' \
                     "$f"
                 _patched=$((_patched + 1))
@@ -567,7 +591,6 @@ if command -v awww >/dev/null && ! command -v swww >/dev/null && [[ -f "$_STARTU
             printf '  + swww still referenced in Startup_Apps.conf; would rewrite to awww\n'
         else
             sed -i -e 's/swww-daemon/awww-daemon/g' \
-                   -e 's/swww img -o /awww img --output /g' \
                    -e 's/\bswww\b/awww/g' \
                    "$_STARTUP"
             ok "Rewrote remaining swww references in Startup_Apps.conf."

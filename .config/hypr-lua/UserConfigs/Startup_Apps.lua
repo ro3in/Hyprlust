@@ -57,6 +57,7 @@ hl.on("hyprland.start", function()
     hl.exec_cmd("wl-paste --type image --watch cliphist store")
     hl.exec_cmd("hypridle &")
     hl.exec_cmd("pypr &")
-    hl.exec_cmd("hyprpm reload -n &")
+    -- hyprpm reload removed: no plugins are installed by this config, so it
+    -- only printed "hyprpm: command not found" on every login.
 end)
 
