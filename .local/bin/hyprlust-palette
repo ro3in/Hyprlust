@@ -1,0 +1,127 @@
+#!/usr/bin/env python3
+"""
+Write the Hyprlust music panel's palette from the wallust colour files.
+
+    hyprlust-palette
+
+Hyprlust already writes wallust colours for waybar, kitty, rofi and swaync. The
+Quickshell panel cannot read CSS, so this turns the same palette into the small
+JSON file it can read. It runs at the end of WallustSwww.sh, so the panel follows
+every wallpaper change.
+
+Output: ~/.cache/hyprlust/colors.json
+    {"background": "#131318", "foreground": "#e4e1e9",
+     "accent": "#9ec9bd", "muted": "#7a7a8c", "chip": "#1e1e26"}
+
+If the wallust files are missing (no wallpaper set yet) it writes Hyprlust's
+shipped default palette instead, so the panel is never unstyled.
+"""
+
+import json
+import os
+import re
+import sys
+
+HOME = os.environ.get("HOME", "")
+
+# Hyprlust's default palette, from its own waybar/swaync wallust output.
+DEFAULT = {
+    "background": "#131318",
+    "foreground": "#e4e1e9",
+    "accent": "#9ec9bd",
+    "muted": "#7a7a8c",
+    "chip": "#1e1e26",
+}
+
+# Prefer swaync's colours: same palette, already parsed as plain hex.
+SOURCES = [
+    os.path.join(HOME, ".config/swaync/wallust/colors-wallust.css"),
+    os.path.join(HOME, ".config/waybar/wallust/colors-waybar.css"),
+]
+
+DEFINE = re.compile(r"@define-color\s+([A-Za-z0-9_-]+)\s+(.+?);")
+
+# wallust emits alpha(#rrggbb,0.5); we only want the hex part.
+HEX = re.compile(r"#[0-9A-Fa-f]{6}")
+
+
+def read_colors(path):
+    """Return {'foreground': '#rrggbb', 'color5': '#rrggbb', ...}."""
+    colors = {}
+    try:
+        with open(path, "r", encoding="utf-8", errors="replace") as fh:
+            for line in fh:
+                m = DEFINE.search(line)
+                if not m:
+                    continue
+                value = m.group(2).strip()
+                hex_m = HEX.search(value)
+                if hex_m:
+                    colors[m.group(1)] = hex_m.group(0)
+    except OSError:
+        return {}
+    return colors
+
+
+def mix(hex_a, hex_b, ratio):
+    """Blend two #rrggbb colours. ratio 0 = a, 1 = b."""
+    a = [int(hex_a[i:i + 2], 16) for i in (1, 3, 5)]
+    b = [int(hex_b[i:i + 2], 16) for i in (1, 3, 5)]
+    out = [round(x + (y - x) * ratio) for x, y in zip(a, b)]
+    return "#%02x%02x%02x" % tuple(out)
+
+
+def build():
+    colors = {}
+    for path in SOURCES:
+        colors = read_colors(path)
+        if colors:
+            break
+
+    if not colors:
+        return dict(DEFAULT)
+
+    bg = colors.get("background") or DEFAULT["background"]
+    fg = colors.get("foreground") or DEFAULT["foreground"]
+
+    # The accent: wallust's brightest loud colour. color6/color5 are the ones
+    # Hyprlust's own CSS picks for selections and highlights.
+    accent = (colors.get("color6") or colors.get("color5")
+              or colors.get("cursor") or DEFAULT["accent"])
+
+    # A quieter tone for secondary text, and a surface one step off the bg for
+    # the lyric block. Both derived so they always belong to the wallpaper.
+    muted = mix(fg, bg, 0.45)
+    chip = mix(bg, fg, 0.07)
+
+    return {
+        "background": bg,
+        "foreground": fg,
+        "accent": accent,
+        "muted": muted,
+        "chip": chip,
+    }
+
+
+def main():
+    if not HOME:
+        print("hyprlust-palette: HOME is not set", file=sys.stderr)
+        return 1
+
+    out_dir = os.path.join(HOME, ".cache/hyprlust")
+    out_file = os.path.join(out_dir, "colors.json")
+
+    try:
+        os.makedirs(out_dir, exist_ok=True)
+        with open(out_file, "w", encoding="utf-8") as fh:
+            json.dump(build(), fh, indent=2)
+            fh.write("\n")
+    except OSError as exc:
+        print(f"hyprlust-palette: {exc}", file=sys.stderr)
+        return 1
+
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

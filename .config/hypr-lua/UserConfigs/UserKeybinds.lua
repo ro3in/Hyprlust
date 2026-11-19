@@ -54,8 +54,8 @@ hl.bind(mainMod .. " + D", hl.dsp.exec_cmd("rofi -show drun -modi drun,filebrows
 hl.bind(mainMod .. " + SHIFT + Return", hl.dsp.exec_cmd("pypr toggle term"))
 -- SUPER+Z  pypr zoom
 hl.bind(mainMod .. " + Z", hl.dsp.exec_cmd("pypr zoom"))
--- SUPER+I / SUPER+SHIFT+I  music (mpd) and the theme switcher
-hl.bind(mainMod .. " + SHIFT + I", hl.dsp.exec_cmd(UserScripts .. "/mpd.sh"))
+-- SUPER+SHIFT+I  the Hyprlust music panel (Quickshell)
+hl.bind(mainMod .. " + SHIFT + I", hl.dsp.exec_cmd("qs ipc -c hyprlust-music call music toggle"))
 hl.bind(mainMod .. " + ALT + R", hl.dsp.exec_cmd(scriptsDir .. "/Refresh.sh"))
 hl.bind(mainMod .. " + ALT + E", hl.dsp.exec_cmd(scriptsDir .. "/RofiEmoji.sh"))
 -- SUPER+ALT+F  float every window. The old hyprlang `workspaceopt allfloat`

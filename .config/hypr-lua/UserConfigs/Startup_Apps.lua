@@ -53,6 +53,8 @@ hl.on("hyprland.start", function()
     hl.exec_cmd("waybar &")
     hl.exec_cmd("nm-applet --indicator &")
     hl.exec_cmd("swaync &")
+    -- Music panel (SUPER+SHIFT+I). Resident so the keybind opens instantly.
+    hl.exec_cmd("qs -n -c hyprlust-music &")
     hl.exec_cmd("wl-paste --type text --watch cliphist store")
     hl.exec_cmd("wl-paste --type image --watch cliphist store")
     hl.exec_cmd("hypridle &")

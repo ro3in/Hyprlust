@@ -106,6 +106,12 @@ aur:limusic-bin           # YouTube Music client
 mission-center            # system monitor GUI (CTRL+SHIFT+Escape)
 
 # ---------------------------------------------------------------------------
+# Music panel (SUPER+SHIFT+I)
+# ---------------------------------------------------------------------------
+quickshell                # the music popup is built on it
+python                    # hyprlust-lyrics / hyprlust-palette helpers
+
+# ---------------------------------------------------------------------------
 # Fonts / icons (the rices reference these by name)
 # ---------------------------------------------------------------------------
 ttf-jetbrains-mono-nerd

@@ -449,6 +449,8 @@ CONFIG_ITEMS=(
     mpd rmpc mpv nvim yazi zathura swappy wallust matugen
     # Personal app configs (bundled with the fork).
     micro qimgv easyeffects vm-curator
+    # Music popup (Quickshell). Deployed with its helper scripts.
+    quickshell
 )
 
 # pyprland reads ~/.config/pypr/config.toml and warns at startup about the
@@ -471,6 +473,66 @@ deploy_pypr_config() {
     fi
     run cp -a "$src" "$dest"
     ok "Placed pyprland config at ~/.config/pypr/config.toml."
+}
+
+# Music popup (Quickshell) --------------------------------------------------
+deploy_music_panel() {
+    local qml_src="$REPO_DIR/.config/quickshell/hyprlust-music"
+    local qml_dest="$HOME/.config/quickshell/hyprlust-music"
+    local bin_dest="$HOME/.local/bin"
+
+    [[ -d "$qml_src" ]] || return 0
+
+    if (( DRY_RUN )); then
+        printf '  + place the music popup at %s\n' "$qml_dest"
+        printf '  + place hyprlust-lyrics and hyprlust-palette in %s\n' "$bin_dest"
+        printf '  + wire the panel colours into WallustSwww.sh\n'
+        return 0
+    fi
+
+    # Quickshell config. Copy the directory, replacing any older copy so a
+    # renamed or removed QML file cannot linger and break the panel.
+    mkdir -p "$HOME/.config/quickshell"
+    if [[ -e "$qml_dest" ]]; then
+        mkdir -p "$BACKUP_DIR/.config/quickshell"
+        run cp -a "$qml_dest" "$BACKUP_DIR/.config/quickshell/hyprlust-music"
+        run rm -rf "$qml_dest"
+    fi
+    run cp -a "$qml_src" "$qml_dest"
+
+    # Helper scripts. Hyprland's exec does not read fish's PATH, so the QML
+    # calls them by absolute path; they only need to live here and be executable.
+    mkdir -p "$bin_dest"
+    local helper
+    for helper in hyprlust-lyrics hyprlust-palette; do
+        [[ -f "$REPO_DIR/.local/bin/$helper" ]] || continue
+        run install -Dm755 "$REPO_DIR/.local/bin/$helper" "$bin_dest/$helper"
+    done
+
+    # The panel reads a JSON palette; wallust only writes CSS. Generate it once
+    # now so the panel is styled before the first wallpaper change.
+    if [[ -x "$bin_dest/hyprlust-palette" ]]; then
+        "$bin_dest/hyprlust-palette" >/dev/null 2>&1 || true
+    fi
+
+    # And re-generate it after every wallpaper change, then tell the running
+    # panel to re-read it.
+    local wallust_sh="$HOME/.config/hypr/scripts/WallustSwww.sh"
+    if [[ -f "$wallust_sh" ]] && ! grep -q 'hyprlust-music' "$wallust_sh"; then
+        cat >>"$wallust_sh" <<'EOF'
+
+# hyprlust-music: turn wallust's CSS palette into the JSON the music panel reads.
+# wallust runs with -s above, so give it a moment to finish writing.
+(
+  sleep 1.5
+  "$HOME/.local/bin/hyprlust-palette" >/dev/null 2>&1
+  qs ipc -c hyprlust-music call music reload 2>/dev/null || true
+) &
+EOF
+        ok "Wired the music panel colours into WallustSwww.sh."
+    fi
+
+    ok "Music panel installed — SUPER+SHIFT+I."
 }
 
 backup_and_place() {
@@ -498,6 +560,7 @@ for item in "${CONFIG_ITEMS[@]}"; do
     backup_and_place "$src" "$HOME/.config/$item"
 done
 deploy_pypr_config
+deploy_music_panel
 
 # ---------------------------------------------------------------------------
 # 5b. Hyprland config format: .lua for 0.57+, .conf for older

@@ -26,12 +26,13 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/ro3in/Hyprlust/master/in
 5. Clones upstream Hyprlust and this repo.
 6. Deploys `config.fish` plus the desktop configs, backing up anything it
    replaces to `~/.config-backup-<timestamp>/`.
-7. Repairs the broken absolute symlinks upstream ships.
-8. Adapts Hyprlust's `swww` calls to `awww`.
-9. Rewrites hardcoded `/home/hypr` paths to your `$HOME`.
-10. Detects your GPU and installs/verifies the matching drivers (NVIDIA, AMD,
+7. Installs the [music panel](#music-panel) and its helper scripts.
+8. Repairs the broken absolute symlinks upstream ships.
+9. Adapts Hyprlust's `swww` calls to `awww`.
+10. Rewrites hardcoded `/home/hypr` paths to your `$HOME`.
+11. Detects your GPU and installs/verifies the matching drivers (NVIDIA, AMD,
     or Intel), including hybrid setups.
-11. Enables NetworkManager and Bluetooth, offers to switch your shell to fish.
+12. Enables NetworkManager and Bluetooth, offers to switch your shell to fish.
 
 ## Your own apps: `apps.list`
 
@@ -59,7 +60,6 @@ These configs are deployed to `~/.config/` along with the desktop:
 
 | App | Config |
 |---|---|
-| `alacritty` | `alacritty/` (theme + keybinds) |
 | `micro` | `micro/` (catppuccin + syntax files) |
 | `qimgv` | `qimgv/` |
 | `easyeffects` | `easyeffects/` (EQ / effects chains) |
@@ -68,6 +68,41 @@ These configs are deployed to `~/.config/` along with the desktop:
 Deliberately **not** bundled: browser profiles (`helium`, `chrome`, `firefox`),
 `~/.config/opencode` (holds API keys), Spotify/Spicetify state, and any
 `~/.local/share` app data. Those are per-machine state, not configuration.
+
+## Music panel
+
+`SUPER + SHIFT + I` opens a now-playing popup:
+
+- cover art, title, artist and album of whatever is playing
+- synced lyrics from [LRCLIB](https://lrclib.net) (free, no key; falls back to
+  plain text, then to "no lyrics for this one")
+- draggable progress bar and play/pause/previous/next
+- colours taken from the current wallpaper, refreshed on every change
+
+It controls **any** MPRIS player — Spotify, Helium, Firefox, mpv, VLC — so it
+does not depend on MPD being set up.
+
+It is a small [Quickshell](https://quickshell.org) config, deliberately built in
+the rice's own visual language: 6px corners, a 2px wallpaper-accent border,
+translucent background, mono font, flat buttons. Nothing Material You.
+
+| File | Purpose |
+|---|---|
+| `~/.config/quickshell/hyprlust-music/shell.qml` | the panel |
+| `~/.local/bin/hyprlust-lyrics` | LRCLIB lookup, prints JSON |
+| `~/.local/bin/hyprlust-palette` | turns wallust's CSS into the panel's palette |
+| `~/.cache/hyprlust/colors.json` | generated palette (rewritten per wallpaper) |
+
+`hyprlust-palette` is appended to `WallustSwww.sh` on install, so the panel
+follows wallpaper changes like the rest of the desktop.
+
+If the panel does not appear, check that it is running and that its target is
+registered:
+
+```fish
+qs list --all
+qs ipc -c hyprlust-music show
+```
 
 
 ## Differences from upstream

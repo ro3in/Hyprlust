@@ -1,0 +1,184 @@
+#!/usr/bin/env python3
+"""
+Look a song up on LRCLIB and print it as JSON for the Hyprlust music panel.
+
+    hyprlust-lyrics <artist> <title> [album] [durationSeconds]
+
+Output:
+    {"synced": [[seconds, "line"], ...], "plain": "full text", "id": 123}
+
+LRCLIB is free and needs no API key. Songs that are instrumental, missing, or
+unreachable all come back as empty results — the panel then says "no lyrics for
+this one" instead of failing.
+"""
+
+import json
+import re
+import sys
+import urllib.error
+import urllib.parse
+import urllib.request
+
+UA = "Hyprlust/1.0 (https://github.com/ro3in/Hyprlust)"
+TIMEOUT = 6
+
+# [01:23.45] Text  /  [01:23.45]Text  (both are common)
+LRC_TIME = re.compile(r"^\[(\d{1,3}):(\d{2})(?:[.:](\d{1,3}))?\]")
+
+
+def get(url):
+    req = urllib.request.Request(url, headers={"User-Agent": UA})
+    with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
+        return json.loads(resp.read().decode("utf-8", "replace"))
+
+
+def parse_lrc(text):
+    """Turn LRC text into [[seconds, line], ...], sorted and de-duplicated."""
+    out = []
+    for raw in text.splitlines():
+        raw = raw.rstrip()
+        if not raw:
+            continue
+        times = []
+        rest = raw
+        # One line may carry several timestamps: [00:10.00][00:40.00] Chorus
+        while True:
+            m = LRC_TIME.match(rest)
+            if not m:
+                break
+            minutes = int(m.group(1))
+            seconds = int(m.group(2))
+            frac = m.group(3) or "0"
+            # ".45" is centiseconds, ".456" milliseconds
+            frac = int(frac.ljust(3, "0")[:3]) / 1000.0
+            times.append(minutes * 60 + seconds + frac)
+            rest = rest[m.end():]
+        if not times:
+            continue
+        line = rest.strip()
+        for t in times:
+            out.append([round(t, 2), line])
+
+    out.sort(key=lambda x: x[0])
+
+    # Drop the duplicates a repeated timestamp would create.
+    deduped = []
+    for item in out:
+        if deduped and deduped[-1][0] == item[0] and deduped[-1][1] == item[1]:
+            continue
+        deduped.append(item)
+    return deduped
+
+
+def plain_from_lrc(text):
+    """Lyrics without the timestamps, for players that only show plain text."""
+    lines = []
+    for raw in text.splitlines():
+        cleaned = LRC_TIME.sub("", raw).strip()
+        if cleaned == "" and (not lines or lines[-1] == ""):
+            continue
+        lines.append(cleaned)
+    return "\n".join(lines).strip()
+
+
+def fetch(artist, title, album, duration):
+    base = "https://lrclib.net/api"
+
+    # 1. Exact match. The most reliable, so try it first when we have enough.
+    if artist and title:
+        params = {"artist_name": artist, "track_name": title}
+        if album:
+            params["album_name"] = album
+        if duration and duration > 0:
+            params["duration"] = str(int(round(duration)))
+        try:
+            data = get(f"{base}/get?{urllib.parse.urlencode(params)}")
+            if data and (data.get("syncedLyrics") or data.get("plainLyrics")):
+                return data
+        except urllib.error.HTTPError:
+            pass          # 404 is the normal "no such track" answer
+        except Exception:
+            pass
+
+    # 2. Fuzzy search. Durations in MPRIS are often wrong, so compare loosely.
+    query = " ".join(x for x in (artist, title) if x)
+    if not query:
+        return None
+    params = {"q": query}
+    try:
+        results = get(f"{base}/search?{urllib.parse.urlencode(params)}")
+    except Exception:
+        return None
+    if not isinstance(results, list) or not results:
+        return None
+
+    best = None
+    best_score = 0.0
+    for item in results:
+        if not (item.get("syncedLyrics") or item.get("plainLyrics")):
+            continue
+        score = 0.0
+        if item.get("trackName", "").lower() == title.lower():
+            score += 2.0
+        if item.get("artistName", "").lower() == artist.lower():
+            score += 2.0
+        item_dur = item.get("duration") or 0
+        if duration and item_dur:
+            delta = abs(float(item_dur) - float(duration))
+            if delta <= 3:
+                score += 1.0
+            elif delta <= 8:
+                score += 0.5
+        if item.get("syncedLyrics"):
+            score += 0.25
+        if score > best_score:
+            best_score = score
+            best = item
+    return best
+
+
+def main():
+    args = sys.argv[1:]
+    if len(args) < 2:
+        print(json.dumps({"synced": [], "plain": "", "id": None}))
+        return 0
+
+    # A title alone is enough. Local files played by mpv often carry no artist
+    # tag, and the search below still finds them.
+    artist = args[0].strip()
+    title = args[1].strip()
+    if not title:
+        print(json.dumps({"synced": [], "plain": "", "id": None}))
+        return 0
+    album = args[2].strip() if len(args) > 2 else ""
+    try:
+        duration = float(args[3]) if len(args) > 3 else 0.0
+    except ValueError:
+        duration = 0.0
+
+    try:
+        data = fetch(artist, title, album, duration) or {}
+    except Exception:
+        data = {}
+
+    synced_text = data.get("syncedLyrics") or ""
+    plain_text = data.get("plainLyrics") or ""
+
+    if synced_text:
+        synced = parse_lrc(synced_text)
+        plain = plain_text or plain_from_lrc(synced_text)
+    else:
+        synced = []
+        plain = plain_text
+
+    print(json.dumps({
+        "synced": synced,
+        "plain": plain,
+        "id": data.get("id"),
+        "instrumental": bool(data.get("instrumental")),
+    }, ensure_ascii=False))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
