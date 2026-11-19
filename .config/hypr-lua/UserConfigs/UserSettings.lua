@@ -73,7 +73,9 @@ hl.animation({
 hl.config({
     dwindle = {
         preserve_split = true,
-        special_scale_factor = 0.8,
+        -- special_scale_factor removed: deprecated in Hyprland 0.57
+        -- ("Use workspace rules to achieve the same effect"). Keeping it made
+        -- every start print a "deprecated config option" warning.
     },
     master = {
         --new_is_master=1 # comment this when Hyprland release a new version or you are running the git version
