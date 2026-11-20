@@ -28,7 +28,7 @@ kitty                     # Hyprlust's terminal (SUPER+Return / SUPER+T)
 # ---------------------------------------------------------------------------
 nautilus                  # GNOME file manager (your config bundled)
 dolphin                   # KDE file manager
-aur:qimgv-git             # image viewer, your config bundled
+aur:qimgv                 # image viewer, your config bundled
 imv                       # fast Wayland image viewer
 meld                      # diff / merge tool
 mpv                       # video player
@@ -100,7 +100,7 @@ edk2-ovmf                 # UEFI firmware for VMs
 dnsmasq                   # libvirt's DHCP/DNS
 openbsd-netcat
 swtpm                     # TPM emulation
-aur:vm-curator            # your QEMU TUI, config bundled
+aur:vm-curator-bin        # your QEMU TUI, config bundled
 aur:bottles               # Wine/proton prefix manager
 
 # ---------------------------------------------------------------------------

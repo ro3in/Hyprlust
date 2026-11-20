@@ -204,7 +204,7 @@ AUR_PKGS=(
     pyprland              # SUPER+SHIFT+Return dropdown terminal
     wallust               # recolours kitty/waybar/swaync from the wallpaper
     wlogout               # power menu (CTRL+ALT+P)
-    sptlrx                # spotify lyrics in the bar
+    sptlrx-bin            # spotify lyrics in the bar
     bibata-cursor-theme-bin
     tela-circle-icon-theme-git
     iio-hyprland-git      # autorotate on tablets/laptops
@@ -363,13 +363,22 @@ if [[ -n "$AUR_HELPER" ]]; then
         paru) _aur_opts=(--skipreview --batchinstall) ;;
     esac
 
-    for pkg in "${AUR_PKGS[@]}"; do
-        if run "$AUR_HELPER" -S --needed --noconfirm "${_aur_opts[@]}" "$pkg" < /dev/null; then
-            :
+    if (( ${#AUR_PKGS[@]} > 0 )); then
+        # One helper invocation for every AUR package instead of one per
+        # package — far fewer helper startups and prompt round-trips.
+        if run "$AUR_HELPER" -S --needed --noconfirm "${_aur_opts[@]}" "${AUR_PKGS[@]}" < /dev/null; then
+            ok "AUR packages installed."
         else
-            warn "AUR package '$pkg' failed — continuing without it."
+            warn "Batch AUR install failed — retrying package by package to isolate problems..."
+            for pkg in "${AUR_PKGS[@]}"; do
+                if run "$AUR_HELPER" -S --needed --noconfirm "${_aur_opts[@]}" "$pkg" < /dev/null; then
+                    :
+                else
+                    warn "AUR package '$pkg' failed — continuing without it."
+                fi
+            done
         fi
-    done
+    fi
 
     # wallust is a large Rust build (~260 crates) and is the one AUR package
     # most likely to be killed on a small VM. It only drives colour theming,
@@ -512,7 +521,7 @@ deploy_music_panel() {
     [[ -d "$qml_src" ]] || return 0
 
     if (( DRY_RUN )); then
-        printf '  + place the music popup at %s\n' "$qml_dest"
+        printf '  + place the music dock panel at %s\n' "$qml_dest"
         printf '  + place hyprlust-lyrics and hyprlust-palette in %s\n' "$bin_dest"
         printf '  + wire the panel colours into WallustSwww.sh\n'
         return 0

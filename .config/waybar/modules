@@ -251,6 +251,15 @@
 	"interval": 86400, // once every day
 	"tooltip": true,
 },
+// Music panel toggle — opens/closes the dock-attached music panel.
+// Click: toggle panel. Right-click: open in pavucontrol.
+"custom/music": {
+	"format": " ",
+	"tooltip": "Music panel",
+	"on-click": "qs ipc -c hyprlust-music call music toggle",
+	"interval": "once",
+	"escape": true
+},
 "custom/swaync": {
 	"tooltip": true,
 	"format": "{icon} {}",

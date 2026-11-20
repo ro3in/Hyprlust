@@ -35,6 +35,7 @@ Preview without changing anything: add `-- --dry-run` to the command above.
 **Your apps:** [apps.list](apps.list) at the repo root is the list of extra
 packages installed on every machine. Edit it, then re-run the installer.
 
-**Music panel:** press `SUPER + SHIFT + I` for a now-playing popup with cover
-art, synced lyrics and controls for any player — built in the rice's own style.
+**Music panel:** press `SUPER + SHIFT + I` (or click the bar icon) for a
+now-playing dock-attached panel with cover art, synced lyrics and controls for
+any player — built in the rice's own style.
 See [INSTALL.md](INSTALL.md) for requirements and notes.

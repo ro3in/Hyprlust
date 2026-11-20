@@ -71,24 +71,29 @@ Deliberately **not** bundled: browser profiles (`helium`, `chrome`, `firefox`),
 
 ## Music panel
 
-`SUPER + SHIFT + I` opens a now-playing popup:
+`SUPER + SHIFT + I` — or a click on the music icon in the top bar — opens a
+now-playing panel that hangs off the right end of the waybar:
 
-- cover art, title, artist and album of whatever is playing
+- cover art in a seal/scallop frame, title, artist and album of whatever's playing
+- a grey "service chip" (Spotify, Helium/YouTube Music, …)
 - synced lyrics from [LRCLIB](https://lrclib.net) (free, no key; falls back to
   plain text, then to "no lyrics for this one")
-- draggable progress bar and play/pause/previous/next
+- squiggle progress bar with play/pause/previous/next and volume
 - colours taken from the current wallpaper, refreshed on every change
+
+It closes with `Escape`, the bar icon, `SUPER + SHIFT + I` again, or a click
+anywhere outside the card — there is no dimmed backdrop.
 
 It controls **any** MPRIS player — Spotify, Helium, Firefox, mpv, VLC — so it
 does not depend on MPD being set up.
 
 It is a small [Quickshell](https://quickshell.org) config, deliberately built in
-the rice's own visual language: 6px corners, a 2px wallpaper-accent border,
-translucent background, mono font, flat buttons. Nothing Material You.
+the rice's own visual language: 20px radius, translucent background, mono font,
+flat buttons. Nothing Material You.
 
 | File | Purpose |
 |---|---|
-| `~/.config/quickshell/hyprlust-music/shell.qml` | the panel |
+| `~/.config/quickshell/hyprlust-music/shell.qml` | the dock panel |
 | `~/.local/bin/hyprlust-lyrics` | LRCLIB lookup, prints JSON |
 | `~/.local/bin/hyprlust-palette` | turns wallust's CSS into the panel's palette |
 | `~/.cache/hyprlust/colors.json` | generated palette (rewritten per wallpaper) |
