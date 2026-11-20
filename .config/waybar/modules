@@ -20,6 +20,7 @@
 		"2": [],
 		"3": [],
 		"4": [],
+		"5": [],
 	},
 	"format-icons": {
 		"1": " ",
@@ -252,12 +253,14 @@
 	"tooltip": true,
 },
 // Music panel toggle — opens/closes the dock-attached music panel.
-// Click: toggle panel. Right-click: open in pavucontrol.
+// Shows cava visualizer bars while music plays, a music note when idle.
+// Click: toggle panel.
 "custom/music": {
-	"format": " ",
+	"exec": "~/.config/hypr/scripts/WaybarMusic.sh",
+	"format": "{}",
 	"tooltip": "Music panel",
 	"on-click": "qs ipc -c hyprlust-music call music toggle",
-	"interval": "once",
+	"interval": 0.1,
 	"escape": true
 },
 "custom/swaync": {

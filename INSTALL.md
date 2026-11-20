@@ -88,8 +88,10 @@ It controls **any** MPRIS player — Spotify, Helium, Firefox, mpv, VLC — so i
 does not depend on MPD being set up.
 
 It is a small [Quickshell](https://quickshell.org) config, deliberately built in
-the rice's own visual language: 20px radius, translucent background, mono font,
-flat buttons. Nothing Material You.
+the rice's own visual language: a flat translucent card, 26px radius, a thin
+accent edge, JetBrainsMono Nerd Font icons and mono text, flat transport
+buttons that light up on hover. Nothing Material You — no pills, no filled
+primary button, no tonal surfaces.
 
 | File | Purpose |
 |---|---|

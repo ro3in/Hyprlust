@@ -523,6 +523,7 @@ deploy_music_panel() {
     if (( DRY_RUN )); then
         printf '  + place the music dock panel at %s\n' "$qml_dest"
         printf '  + place hyprlust-lyrics and hyprlust-palette in %s\n' "$bin_dest"
+        printf '  + place WaybarMusic.sh in %s\n' "$HOME/.config/hypr/scripts"
         printf '  + wire the panel colours into WallustSwww.sh\n'
         return 0
     fi
@@ -545,6 +546,14 @@ deploy_music_panel() {
         [[ -f "$REPO_DIR/.local/bin/$helper" ]] || continue
         run install -Dm755 "$REPO_DIR/.local/bin/$helper" "$bin_dest/$helper"
     done
+
+    # The waybar music module script (visualizer when playing, music note when idle).
+    local script_dest="$HOME/.config/hypr/scripts"
+    mkdir -p "$script_dest"
+    if [[ -f "$REPO_DIR/.config/hypr/scripts/WaybarMusic.sh" ]]; then
+        run install -Dm755 "$REPO_DIR/.config/hypr/scripts/WaybarMusic.sh" \
+                       "$script_dest/WaybarMusic.sh"
+    fi
 
     # The panel reads a JSON palette; wallust only writes CSS. Generate it once
     # now so the panel is styled before the first wallpaper change.

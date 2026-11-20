@@ -1,24 +1,16 @@
 // Hyprlust music dock — a Quickshell panel that hangs off the bar.
 //
 // It is not a floating popup: the card is a layer-shell surface anchored to the
-// top-right of the focused monitor, right under the waybar bar, so it reads as
-// part of the bar rather than a window in the middle of the screen.
+// top-right of the focused monitor, right under the waybar bar. No dimmed
+// backdrop, no modal grab — it opens like a dropdown and closes with Escape,
+// the bar module, or SUPER+SHIFT+I again.
 //
-// Visual language matches the DarkShadow-style reference card:
-//   • dark translucent card, radius 20, no visible border
-//   • seal/scallop-shaped cover frame with a dark halo
-//   • grey pill chip ("Youtube Music")
-//   • bold title + "artist · album"
-//   • rounded lyrics box with the current line bold and pinned at the top
-//   • squiggle progress bar (played part wavy, rest a plain track)
-//   • five round pill buttons with a wide light primary (pause/play)
-//   • thin scrollbar under the buttons
+// Visual language is Hyprlust's own (DarkShadow's Shell): flat, translucent
+// card, 26px corners, a thin accent edge, JetBrainsMono Nerd Font for icons
+// and mono, Google Sans Flex/Rubik/Inter for UI. No Material You pills, no
+// filled tonal surfaces, no light primary buttons.
 //
-// Opens/closes with `qs ipc call music toggle` (SUPER+SHIFT+I, or the bar icon),
-// Escape, or a click anywhere outside the card. No dimmed backdrop.
-//
-// Toggled with `qs ipc call music toggle` (SUPER+SHIFT+I, or a click on the
-// bar's mpris module).
+// Toggled with `qs ipc call music toggle` (SUPER+SHIFT+I, or the bar icon).
 import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Io
@@ -74,17 +66,15 @@ ShellRoot {
     readonly property color cMuted:  pal.muted
     readonly property color cChip:   pal.chip
 
-    // Where the bar sits. These mirror ~/.config/waybar/configs/[TOP] wallust_new;
-    // change them if you resize the bar and the dock keeps hanging off its right
-    // edge instead of drifting to the corner of the screen.
-    readonly property int barWidth:     1200   // 0 = the bar spans the screen
+    // Where the bar sits. Mirrors ~/.config/waybar/configs/[TOP] wallust_new;
+    // change these if you resize the bar and the dock keeps hanging off its
+    // right edge instead of drifting to the corner of the screen.
+    readonly property int barWidth:     1200
     readonly property int barHeight:    34
     readonly property int barTopMargin: 5
-    readonly property int barGap:       7      // space between bar and card
+    readonly property int barGap:       7
 
     // ------------------------------------------------------------- the player
-    // One source of truth for "what is playing": the first MPRIS player that is
-    // actually playing, else the first one that exists.
     readonly property var player: {
         const list = Mpris.players.values
         for (let i = 0; i < list.length; i++)
@@ -100,8 +90,6 @@ ShellRoot {
     readonly property string art:     player && player.trackArtUrl ? player.trackArtUrl : ""
     readonly property real  length:   player && player.length > 0 ? player.length : 0
 
-    // limusic is a YouTube Music client and reports itself as "Limusic"; show
-    // the service people actually recognise.
     readonly property string source: {
         if (!player) return ""
         const n = player.identity || "Music"
@@ -113,7 +101,7 @@ ShellRoot {
 
     onPlayerChanged: pos = player ? player.position : 0
 
-    // MPRIS only pushes position changes occasionally, so poll while it plays.
+    // Poll position while playing (MPRIS pushes position only occasionally).
     Timer {
         interval: 1000
         repeat: true
@@ -128,8 +116,6 @@ ShellRoot {
     }
 
     // -------------------------------------------------------------- the volume
-    // Pipewire takes a moment to become ready; the bindings re-evaluate when it
-    // does, so the volume row appears a second after login.
     readonly property var sink: Pipewire.ready ? Pipewire.defaultAudioSink : null
     readonly property bool hasSink: sink !== null && sink.audio !== undefined
     readonly property real volume: hasSink && sink.audio ? sink.audio.volume : 0
@@ -143,9 +129,7 @@ ShellRoot {
     function nudgeVolume(d) { setVolume(volume + d) }
 
     // ---------------------------------------------------------------- lyrics
-    // LRCLIB is free and keyless. Synced lines when they exist, plain text when
-    // they don't, and a quiet "no lyrics" note otherwise.
-    property var    lines: []       // [[timeSeconds, text], ...]
+    property var    lines: []
     property string plain: ""
     property bool   loading: false
     property string songKey: ""
@@ -153,11 +137,7 @@ ShellRoot {
     readonly property string want: hasPlayer ? artist + "|" + title : ""
     onWantChanged: lyricsTimer.restart()
 
-    Timer {
-        id: lyricsTimer
-        interval: 450
-        onTriggered: root.fetchLyrics()
-    }
+    Timer { id: lyricsTimer; interval: 450; onTriggered: root.fetchLyrics() }
 
     function fetchLyrics() {
         if (want === "" || want === songKey) return
@@ -202,14 +182,10 @@ ShellRoot {
 
     // ------------------------------------------------------------- visibility
     property bool panelOpen: false
-    // Kept on screen for the length of the closing animation, then removed so
-    // the surface cannot sit there invisibly.
     property bool shown: false
-    // The outside-click catcher is only active while the panel is open.
-    property bool catcherActive: false
 
-    function open()  { panelOpen = true; shown = true; catcherActive = true }
-    function close() { panelOpen = false; catcherActive = false; hideTimer.restart() }
+    function open()  { panelOpen = true; shown = true }
+    function close() { panelOpen = false; hideTimer.restart() }
     function toggle() { panelOpen ? close() : open() }
 
     Timer {
@@ -219,14 +195,10 @@ ShellRoot {
     }
 
     // ------------------------------------------------------------- window
-    // A layer-shell surface the size of the card, anchored to the top-right.
     PanelWindow {
         id: win
         visible: root.shown
 
-        // Hang off the monitor you are looking at, not whichever one
-        // Quickshell happened to attach to first. Hyprland and Quickshell name
-        // monitors identically, so match on that.
         screen: {
             const mon = Hyprland.focusedMonitor
             if (!mon) return null
@@ -248,49 +220,48 @@ ShellRoot {
         anchors.top: true
         anchors.right: true
 
-        // Right edge of the bar. The bar is fixed-center with width barWidth,
-        // so its right edge sits (screen.width − barWidth)/2 from the right.
         margins.right: root.barWidth > 0 && win.screen
             ? Math.round((win.screen.width - root.barWidth) / 2) + 8
             : 8
         margins.top: root.barTopMargin + root.barHeight + root.barGap
 
-        // Escape closes it, like every other dropdown in the rice.
+        // Escape closes it.
         Item {
             anchors.fill: parent
             focus: root.panelOpen
             Keys.onEscapePressed: root.close()
 
-            // Catches clicks outside the card to close the panel
-            // (outside-click close). Sits behind the card so card clicks
-            // never reach it.
+            // Outside-click catcher: sits behind the card, only active when open.
             Rectangle {
                 id: catcher
-                visible: root.catcherActive
+                visible: root.panelOpen
                 color: "transparent"
                 anchors.fill: parent
                 MouseArea {
                     anchors.fill: parent
-                    enabled: root.catcherActive
+                    enabled: root.panelOpen
                     onClicked: root.close()
                 }
             }
 
             // ------------------------------------------------------ the card
+            // Native Hyprlust card style: 26px radius, translucent dark fill,
+            // thin accent edge, soft shine along the top edge (Card.qml).
             Rectangle {
                 id: card
                 width: 384
                 implicitHeight: body.implicitHeight + 40
 
-                radius: 20
-                color: Qt.rgba(root.cBg.r, root.cBg.g, root.cBg.b, 0.92)
-                border.width: 0
+                radius: 26
+                color: Qt.rgba(0.10, 0.10, 0.115, 0.82)
+                border.width: 1
+                border.color: Qt.rgba(1, 1, 1, 0.08)
 
                 // Drops out of the bar: slides down 10px and fades.
                 opacity: root.panelOpen ? 1 : 0
                 y: root.panelOpen ? 0 : -10
-                Behavior on opacity { NumberAnimation { duration: 180 } }
-                Behavior on y { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+                Behavior on opacity { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
+                Behavior on y { NumberAnimation { duration: 260; easing.type: Easing.OutCubic; easing.overshoot: 0.9 } }
 
                 Column {
                     id: body
@@ -302,13 +273,12 @@ ShellRoot {
                         width: parent.width
                         height: 104
 
-                        // Seal / scalloped cover frame with cover art inside.
+                        // Cover art inside a soft scalloped frame.
                         Item {
                             id: coverWrap
                             width: 104
                             height: 104
 
-                            // Dark scalloped halo behind the cover.
                             Canvas {
                                 id: sealHalo
                                 anchors.fill: parent
@@ -328,7 +298,6 @@ ShellRoot {
                                         const ry = cy + Math.sin(a) * r
                                         if (i === 0) c.moveTo(rx, ry)
                                         else c.lineTo(rx, ry)
-                                        // scallop bulge
                                         const ba = a + Math.PI / petals
                                         c.quadraticCurveTo(cx + Math.cos(ba) * (r + 10),
                                                             cy + Math.sin(ba) * (r + 10),
@@ -342,7 +311,6 @@ ShellRoot {
                                 onHeightChanged: requestPaint()
                             }
 
-                            // Cover art, slight round corners.
                             Rectangle {
                                 id: artFrame
                                 anchors.centerIn: parent
@@ -364,7 +332,7 @@ ShellRoot {
                                     anchors.centerIn: parent
                                     visible: root.art === "" || cover.status !== Image.Ready
                                     text: "\uf001"
-                                    font.family: "Symbols Nerd Font"
+                                    font.family: "JetBrainsMono Nerd Font"
                                     font.pixelSize: 30
                                     color: root.cMuted
                                 }
@@ -392,8 +360,8 @@ ShellRoot {
 
                                     Text {
                                         anchors.centerIn: parent
-                                        text: "\uf075a"   // md-music
-                                        font.family: "Symbols Nerd Font"
+                                        text: "\uf0ea2"
+                                        font.family: "JetBrainsMono Nerd Font"
                                         font.pixelSize: 10
                                         color: root.cBg
                                     }
@@ -401,7 +369,7 @@ ShellRoot {
                                 Text {
                                     text: root.source
                                     color: root.cFg
-                                    font.family: "Inter"
+                                    font.family: "JetBrainsMono Nerd Font"
                                     font.pixelSize: 11
                                     font.bold: true
                                     verticalAlignment: Text.AlignVCenter
@@ -412,7 +380,7 @@ ShellRoot {
                                 width: parent.width
                                 text: root.hasPlayer ? root.title : "Nothing playing"
                                 color: root.cFg
-                                font.family: "Inter"
+                                font.family: "Google Sans Flex"
                                 font.pixelSize: 20
                                 font.bold: true
                                 elide: Text.ElideRight
@@ -424,7 +392,7 @@ ShellRoot {
                                 width: parent.width
                                 text: root.hasPlayer ? (root.artist + (root.album ? " · " + root.album : "")) : "Start something in Spotify or YouTube Music"
                                 color: root.cMuted
-                                font.family: "Inter"
+                                font.family: "JetBrainsMono Nerd Font"
                                 font.pixelSize: 12
                                 elide: Text.ElideRight
                                 wrapMode: Text.NoWrap
@@ -468,8 +436,8 @@ ShellRoot {
 
                                 readonly property bool now: index === root.curLine
 
-                                font.family: "Inter"
-                                font.pixelSize: now ? 14.5 : 11.5
+                                font.family: "JetBrainsMono Nerd Font"
+                                font.pixelSize: now ? 14 : 12
                                 font.bold: now
                                 color: now ? root.cAccent : root.cFg
                                 opacity: now ? 1 : Math.max(0.18, 0.6 - Math.abs(index - root.curLine) * 0.16)
@@ -479,8 +447,6 @@ ShellRoot {
                             }
                         }
 
-                        // Plain lyrics fall back to a still block that scrolls
-                        // itself with the song.
                         Flickable {
                             anchors.fill: parent
                             anchors.margins: 12
@@ -497,7 +463,7 @@ ShellRoot {
                                 wrapMode: Text.WordWrap
                                 text: root.plain
                                 color: root.cMuted
-                                font.family: "Inter"
+                                font.family: "JetBrainsMono Nerd Font"
                                 font.pixelSize: 12
                                 lineHeight: 1.4
                             }
@@ -508,11 +474,10 @@ ShellRoot {
                             visible: root.lines.length === 0 && root.plain === ""
                             text: root.loading ? "looking for lyrics…" : "no lyrics for this one"
                             color: root.cMuted
-                            font.family: "Inter"
+                            font.family: "JetBrainsMono Nerd Font"
                             font.pixelSize: 12
                         }
 
-                        // Fade edges so lines don't get cut by the frame.
                         Rectangle {
                             anchors.top: parent.top
                             width: parent.width
@@ -545,7 +510,7 @@ ShellRoot {
                             anchors.verticalCenter: parent.verticalCenter
                             text: root.clock(root.pos)
                             color: root.cMuted
-                            font.family: "Inter"
+                            font.family: "JetBrainsMono Nerd Font"
                             font.pixelSize: 11
                         }
                         Text {
@@ -554,7 +519,7 @@ ShellRoot {
                             anchors.verticalCenter: parent.verticalCenter
                             text: root.clock(root.length)
                             color: root.cMuted
-                            font.family: "Inter"
+                            font.family: "JetBrainsMono Nerd Font"
                             font.pixelSize: 11
                         }
 
@@ -578,36 +543,27 @@ ShellRoot {
                         spacing: 10
                         visible: root.hasPlayer
 
-                        // Round pill buttons; primary is wide and light.
+                        // Flat transport buttons, Hyprlust native style:
+                        // plain rectangles, no fill, mono font icons.
                         component Btn: Rectangle {
                             id: btn
                             property string glyph: ""
-                            property bool primary: false
-                            property bool small: false
                             signal hit()
 
-                            width: primary ? 200 : (small ? 48 : 52)
-                            height: 46
-                            radius: 23
+                            width: 44
+                            height: 44
+                            radius: 22
 
-                            readonly property bool hovered: btnArea.containsMouse
-
-                            color: primary
-                                ? (hovered ? Qt.rgba(0.88, 0.88, 0.9, 0.95)
-                                           : Qt.rgba(0.82, 0.82, 0.86, 0.95))
-                                : (hovered ? Qt.rgba(root.cAccent.r, root.cAccent.g, root.cAccent.b, 0.16)
-                                           : Qt.rgba(root.cAccent.r, root.cAccent.g, root.cAccent.b, 0.09))
-
-                            Behavior on color { ColorAnimation { duration: 130 } }
+                            color: "transparent"
+                            border.width: btn.hovered ? 1 : 0
+                            border.color: root.cAccent
 
                             Text {
                                 anchors.centerIn: parent
                                 text: btn.glyph
-                                font.family: "Symbols Nerd Font"
-                                font.pixelSize: btn.primary ? 20 : 14
-                                color: btn.primary
-                                    ? "#1a1a1e"
-                                    : (btn.hovered ? root.cFg : root.cMuted)
+                                font.family: "JetBrainsMono Nerd Font"
+                                font.pixelSize: 17
+                                color: btn.hovered ? root.cFg : root.cMuted
                             }
 
                             MouseArea {
@@ -621,7 +577,6 @@ ShellRoot {
 
                         Btn {
                             glyph: "\uf075e"          // volume down
-                            small: true
                             onHit: root.nudgeVolume(-0.05)
                         }
                         Btn {
@@ -629,7 +584,6 @@ ShellRoot {
                             onHit: root.prev()
                         }
                         Btn {
-                            primary: true
                             glyph: root.playing ? "\uf03e4" : "\uf040a"   // pause / play
                             onHit: root.togglePlaying()
                         }
@@ -639,7 +593,6 @@ ShellRoot {
                         }
                         Btn {
                             glyph: "\uf057e"          // volume up
-                            small: true
                             onHit: root.nudgeVolume(0.05)
                         }
                     }
@@ -680,9 +633,8 @@ ShellRoot {
         }
     }
 
-    // A wavy seek line: the part already played is a slow wave while the song
-    // plays (it settles at the ends), the rest is a calm track with a tick at
-    // the end, and the playhead is a short upright bar. Click or drag to seek.
+    // A wavy seek line: the played part is a slow wave while the song plays,
+    // the rest a calm track with a tick at the end. Click or drag to seek.
     component SeekBar: Item {
         id: bar
         property real frac: 0
