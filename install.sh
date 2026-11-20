@@ -280,6 +280,11 @@ if (( ${#EXTRA_AUR_PKGS[@]} > 0 )); then
 fi
 
 FAILED_PKGS=()
+# A package that is not in the official repos ends up here instead of aborting
+# the install, and is retried through the AUR helper further down. This means a
+# missing or wrong `aur:` prefix in apps.list can never break a run — pacman
+# simply cannot find it, and the AUR helper picks it up.
+NOT_IN_REPO=()
 if (( DRY_RUN )); then
     run sudo pacman -Syu --needed --noconfirm "${PACMAN_PKGS[@]}"
 else
@@ -290,6 +295,29 @@ else
                 || FAILED_PKGS+=("$pkg")
         done
     fi
+fi
+
+if (( ${#FAILED_PKGS[@]} > 0 )); then
+    # A package pacman cannot find at all is not a failure — it is an AUR
+    # package that was listed without the `aur:` prefix. Hand it to the AUR
+    # helper instead of warning about it.
+    _really_failed=()
+    for pkg in "${FAILED_PKGS[@]}"; do
+        if pacman -Si "$pkg" >/dev/null 2>&1; then
+            _really_failed+=("$pkg")       # exists in the repos: a real failure
+        else
+            NOT_IN_REPO+=("$pkg")          # not in the repos: try the AUR
+        fi
+    done
+    FAILED_PKGS=("${_really_failed[@]}")
+fi
+
+if (( ${#NOT_IN_REPO[@]} > 0 )); then
+    info "${#NOT_IN_REPO[@]} package(s) are not in the official repos — treating them as AUR:"
+    printf '        %s\n' "${NOT_IN_REPO[@]}"
+    for pkg in "${NOT_IN_REPO[@]}"; do
+        [[ " ${AUR_PKGS[*]} " == *" $pkg "* ]] || AUR_PKGS+=("$pkg")
+    done
 fi
 
 if (( ${#FAILED_PKGS[@]} > 0 )); then

@@ -7,6 +7,10 @@
 #  Prefix a line with `aur:` if the package only exists in the AUR.
 #  Everything else is expected from the official repos.
 #
+#  The prefix is a hint, not a requirement: if pacman cannot find a package it
+#  is handed to the AUR helper automatically, so a forgotten `aur:` slows the
+#  install down but never breaks it.
+#
 #  Deliberately NOT included (they break machines or are per-machine):
 #    - kernels, GPU drivers, firmware  -> install.sh detects the GPU itself
 #    - bootloader, LUKS, btrfs/snapper -> these fit one machine, not all
@@ -24,7 +28,7 @@ kitty                     # Hyprlust's terminal (SUPER+Return / SUPER+T)
 # ---------------------------------------------------------------------------
 nautilus                  # GNOME file manager (your config bundled)
 dolphin                   # KDE file manager
-qimgv-git                 # image viewer, your config bundled
+aur:qimgv-git             # image viewer, your config bundled
 imv                       # fast Wayland image viewer
 meld                      # diff / merge tool
 mpv                       # video player
@@ -37,7 +41,7 @@ libgsf                    # document thumbnails
 # ---------------------------------------------------------------------------
 # Browsers
 # ---------------------------------------------------------------------------
-helium-browser-bin        # your main browser (SUPER+H)
+aur:helium-browser-bin    # your main browser (SUPER+H)
 aur:google-chrome         # SUPER+B and SUPER+G use google-chrome-stable
 aur:spotify               # music streaming
 aur:spotify-adblock       # removes Spotify ads
@@ -45,7 +49,7 @@ aur:spotify-adblock       # removes Spotify ads
 # ---------------------------------------------------------------------------
 # Communication / remote
 # ---------------------------------------------------------------------------
-aur:localsend             # send files to your phone
+localsend                 # send files to your phone
 gnome-calendar            # calendar
 
 # ---------------------------------------------------------------------------

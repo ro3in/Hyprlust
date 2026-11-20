@@ -12,63 +12,41 @@ dofile(os.getenv("HOME") .. "/.config/hypr/wallust/wallust-hyprland.lua")
 --blurls = waybar
 -- blurls = rofi
 
-local interval = 6.9
-local curve = "easeOut"
+-- Animations and curves carried over from DarkShadow's Shell, so this rice
+-- moves the way the old setup did: quick pop-in windows, fade-in layers,
+-- sliding workspaces. These are DarkShadow's file-manager-applied values
+-- (rice-settings), which override the ones in hyprland.lua.
+hl.curve("smooth",     { type = "bezier", points = { { 0.22, 1 }, { 0.1, 1.1 } } })
+hl.curve("quick",      { type = "bezier", points = { { 0.15, 0.85 }, { 0.25, 1.0 } } })
+hl.curve("overshot",   { type = "bezier", points = { { 0.05, 0.9 }, { 0.1, 1.08 } } })
+hl.curve("linearish",  { type = "bezier", points = { { 0.3, 0.0 }, { 0.7, 1.0 } } })
+hl.curve("easeOutQuint", { type = "bezier", points = { { 0.23, 1 }, { 0.32, 1 } } })
+-- Spring curves DarkShadow's settings window offers. Kept so the shapes match
+-- if you switch to them later; unused by the animations below.
+hl.curve("ds-soft",    { type = "spring", mass = 1, stiffness = 150, dampening = 19 })
+hl.curve("ds-lively",  { type = "spring", mass = 1, stiffness = 190, dampening = 15 })
+hl.curve("ds-expr",    { type = "spring", mass = 1, stiffness = 320, dampening = 27 })
+hl.curve("ds-expr-soft", { type = "spring", mass = 1, stiffness = 240, dampening = 28 })
 
-hl.curve("default", { type = "bezier", points = { { 0, 1 }, { 0, 1 } } })
-hl.curve("wind", { type = "bezier", points = { { 0.05, 0.69 }, { 0.1, 1 } } })
-hl.curve("winIn", { type = "bezier", points = { { 0.1, 1.1 }, { 0.1, 1 } } })
-hl.curve("winOut", { type = "bezier", points = { { 0.3, 1 }, { 0, 1 } } })
-hl.curve("linear", { type = "bezier", points = { { 1, 1 }, { 1, 1 } } })
-hl.curve("easeOut", { type = "bezier", points = { { 0.16, 1 }, { 0.3, 1 } } })
-hl.animation({
-    leaf = "windows",
-    enabled = true,
-    speed = interval,
-    bezier = curve,
-    style = "slide",
-})
-hl.animation({
-    leaf = "windowsIn",
-    enabled = true,
-    speed = interval,
-    bezier = curve,
-    style = "popin 90%",
-})
-hl.animation({
-    leaf = "windowsOut",
-    enabled = true,
-    speed = interval,
-    bezier = curve,
-    style = "popin 80%",
-})
-hl.animation({
-    leaf = "windowsMove",
-    enabled = true,
-    speed = interval,
-    bezier = curve,
-    style = "slide",
-})
-hl.animation({
-    leaf = "fade",
-    enabled = true,
-    speed = 10,
-    bezier = "default",
-})
-hl.animation({
-    leaf = "workspaces",
-    enabled = true,
-    speed = 10,
-    bezier = curve,
-    style = "slide",
-})
-hl.animation({
-    leaf = "layers",
-    enabled = true,
-    speed = 6.9,
-    bezier = curve,
-    style = "slide",
-})
+-- Windows
+hl.animation({ leaf = "windows",     enabled = true, speed = 2.5, bezier = "quick", style = "popin 95%" })
+hl.animation({ leaf = "windowsIn",   enabled = true, speed = 2.5, bezier = "quick", style = "popin 92%" })
+hl.animation({ leaf = "windowsOut",  enabled = true, speed = 2,   bezier = "quick", style = "popin 95%" })
+hl.animation({ leaf = "windowsMove", enabled = true, speed = 2,   bezier = "quick" })
+
+-- Workspaces
+hl.animation({ leaf = "workspaces",       enabled = true, speed = 3,   bezier = "easeOutQuint", style = "slide" })
+hl.animation({ leaf = "specialWorkspace", enabled = true, speed = 2.5, bezier = "quick", style = "slidevert" })
+
+-- Layers
+hl.animation({ leaf = "layers",    enabled = true, speed = 3, bezier = "quick", style = "fade" })
+hl.animation({ leaf = "layersIn",  enabled = true, speed = 2, bezier = "quick", style = "fade" })
+hl.animation({ leaf = "layersOut", enabled = true, speed = 2, bezier = "quick", style = "fade" })
+hl.animation({ leaf = "fadeLayersIn",  enabled = true, speed = 3, bezier = "linearish" })
+hl.animation({ leaf = "fadeLayersOut", enabled = true, speed = 3, bezier = "linearish" })
+
+-- Fade
+hl.animation({ leaf = "fade", enabled = true, speed = 2.5, bezier = "quick" })
 
 hl.config({
     dwindle = {

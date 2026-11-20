@@ -114,6 +114,28 @@ qs ipc -c hyprlust-music show
 | Config deployment | copies all 128 MB of `~/.config` | only desktop configs, no app caches |
 | Broken symlinks | `waybar/config` → `/home/hypr/...` | repaired to real in-repo files |
 | Hardcoded paths | `/home/hypr` | rewritten to `$HOME` |
+| Animations | slow slides (~7s windows, 10s fade) | **DarkShadow's**: fast pop-in windows (2.5s), fading layers |
+| Window rules | upstream's set | upstream + DarkShadow's float/centre utilities |
+
+### Animations and window rules
+
+The animation block in `UserConfigs/UserSettings` was replaced with the values
+from DarkShadow's Shell, so this rice moves the way that setup did: windows pop
+in quickly at 2.5s with a `quick` curve, layers fade, workspaces slide.
+
+Window rules carried over from DarkShadow:
+
+- ignore maximize requests from every app
+- XWayland drag fix
+- float + centre for `zenity`, `gsimplecal`, `nmtui`, Overskride and Waypaper
+- `hyprland-run` parks at the bottom of the screen
+- no animation on the screenshot selection layer
+- blur for the on-screen display (`swayosd`)
+- waybar tooltips blurred with a 0.2 alpha floor
+
+Both config trees are kept in step: `UserConfigs/UserSettings.conf` and
+`.config/hypr-lua/UserConfigs/UserSettings.lua`, likewise the `WindowRules`
+pair.
 
 ## Requirements
 

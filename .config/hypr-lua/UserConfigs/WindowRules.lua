@@ -965,3 +965,101 @@ hl.layer_rule({
     blur = true,
 })
 
+
+-- ---------------------------------------------------------------------------
+-- Carried over from DarkShadow's Shell (~/.config/hypr/hyprland.lua)
+-- ---------------------------------------------------------------------------
+
+-- Ignore maximize requests from every app. Keeps windows from being forced to
+-- fill the screen by apps that ask for it on launch.
+hl.window_rule({
+    name  = "suppress-maximize-events",
+    match = { class = ".*" },
+    suppress_event = "maximize",
+})
+
+-- Fix some dragging issues with XWayland.
+hl.window_rule({
+    name  = "fix-xwayland-drags",
+    match = {
+        class      = "^$",
+        title      = "^$",
+        xwayland   = true,
+        float      = true,
+        fullscreen = false,
+        pin        = false,
+    },
+    no_focus = true,
+})
+
+-- Small utility windows: float and centre rather than tiling.
+hl.window_rule({
+    name  = "zenity-float",
+    match = { class = ".*[Zz]enity.*" },
+    float  = true,
+    center = true,
+})
+
+hl.window_rule({
+    name  = "gsimplecal-float-center",
+    match = { class = "gsimplecal" },
+    float  = true,
+    center = true,
+})
+
+hl.window_rule({
+    name  = "nmtui-float-center",
+    match = { class = "nmtui" },
+    float  = true,
+    center = true,
+    size   = "800 500",
+})
+
+hl.window_rule({
+    name  = "overskride-float-center",
+    match = { class = "io.github.kaii_lb.Overskride" },
+    float  = true,
+    center = true,
+    size   = "900 650",
+})
+
+hl.window_rule({
+    name  = "waypaper-float-center",
+    match = { class = "waypaper" },
+    float  = true,
+    move   = "cursor -50% -50%",
+    size   = "900 650",
+})
+
+hl.window_rule({
+    name  = "move-hyprland-run",
+    match = { class = "hyprland-run" },
+    float  = true,
+    move   = "20 monitor_h-120",
+})
+
+-- Layer rules from DarkShadow: no animation on the screenshot selection, and a
+-- blur with a low alpha floor for the on-screen display.
+hl.layer_rule({
+    name  = "slurp-no-anim",
+    match = { namespace = "selection" },
+    no_anim = true,
+})
+
+hl.layer_rule({
+    name  = "swayosd-blur",
+    match = { namespace = "swayosd" },
+    blur = true,
+    ignore_alpha = 0.1,
+})
+
+-- Blur waybar tooltips. Hyprlust enables popups already; DarkShadow uses 0.2
+-- as the alpha floor so near-transparent tooltips stay crisp.
+hl.config({
+    decoration = {
+        blur = {
+            popups = true,
+            popups_ignorealpha = 0.2,
+        },
+    },
+})
