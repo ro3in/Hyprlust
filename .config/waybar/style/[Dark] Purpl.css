@@ -178,20 +178,23 @@ tooltip label {
 
 #custom-music {
   font-family: "JetBrainsMono Nerd Font", "Iosevka Nerd Font Propo", monospace;
-  padding: 0px 6px;
+  padding: 0px 8px;
   margin: 4px 2px;
-  background: transparent;
-  color: lighter(@main-color);
+  background: alpha(lighter(@main-color), 0.08);
+  border-radius: 5px;
+  color: alpha(lighter(@main-color), 0.78);
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 #custom-music.music-idle {
-  color: alpha(lighter(@main-color), 0.75);
+  color: alpha(lighter(@main-color), 0.78);
 }
 
 #custom-music.music-viz {
-  color: lighter(@main-color);
+  color: lighter(@color3);
 }
 
 #custom-music:hover {
-  color: @color12;
+  background: alpha(@color12, 0.3);
+  color: lighter(@main-color);
 }

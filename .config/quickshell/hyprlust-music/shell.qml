@@ -360,7 +360,7 @@ ShellRoot {
 
                                     Text {
                                         anchors.centerIn: parent
-                                        text: "\uf0ea2"
+                                        text: "\u{F0EA2}"
                                         font.family: "JetBrainsMono Nerd Font"
                                         font.pixelSize: 10
                                         color: root.cBg
@@ -555,7 +555,7 @@ ShellRoot {
                             radius: 22
 
                             color: "transparent"
-                            border.width: btn.hovered ? 1 : 0
+                            border.width: btnArea.containsMouse ? 1 : 0
                             border.color: root.cAccent
 
                             Text {
@@ -563,7 +563,7 @@ ShellRoot {
                                 text: btn.glyph
                                 font.family: "JetBrainsMono Nerd Font"
                                 font.pixelSize: 17
-                                color: btn.hovered ? root.cFg : root.cMuted
+                                color: btnArea.containsMouse ? root.cFg : root.cMuted
                             }
 
                             MouseArea {
@@ -576,23 +576,23 @@ ShellRoot {
                         }
 
                         Btn {
-                            glyph: "\uf075e"          // volume down
+                            glyph: "\u{F075E}"          // volume down
                             onHit: root.nudgeVolume(-0.05)
                         }
                         Btn {
-                            glyph: "\uf04ae"          // previous
+                            glyph: "\u{F04AE}"          // previous
                             onHit: root.prev()
                         }
                         Btn {
-                            glyph: root.playing ? "\uf03e4" : "\uf040a"   // pause / play
+                            glyph: root.playing ? "\u{F03E4}" : "\u{F040A}"   // pause / play
                             onHit: root.togglePlaying()
                         }
                         Btn {
-                            glyph: "\uf04ad"          // next
+                            glyph: "\u{F04AD}"          // next
                             onHit: root.next()
                         }
                         Btn {
-                            glyph: "\uf057e"          // volume up
+                            glyph: "\u{F057E}"          // volume up
                             onHit: root.nudgeVolume(0.05)
                         }
                     }

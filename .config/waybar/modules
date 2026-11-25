@@ -261,7 +261,7 @@
 	"format": "{}",
 	"tooltip": true,
 	"on-click": "qs ipc -c hyprlust-music call music toggle",
-	"escape": true
+	"escape": false
 },
 "custom/swaync": {
 	"tooltip": true,

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Waybar music module: music note when idle, cava visualizer when playing.
+# Waybar music module: music note when idle, compact 4-bar cava visualizer when playing.
 # Click: toggle the Hyprlust music dock panel.
 #
 #   on-click:  qs ipc -c hyprlust-music call music toggle
@@ -14,7 +14,8 @@ fi
 
 cat > "$CONFIG" <<'EOF'
 [general]
-bars = 8
+bars = 4
+framerate = 30
 
 [input]
 method = pulse
@@ -42,8 +43,35 @@ is_playing() {
     playerctl -a status 2>/dev/null | grep -qx 'Playing'
 }
 
+json_escape() {
+    local s="$1"
+    s="${s//\\/\\\\}"
+    s="${s//\"/\\\"}"
+    s="${s//$'\n'/ }"
+    printf '%s' "$s"
+}
+
+pango_escape() {
+    local s="$1"
+    s="${s//&/&amp;}"
+    s="${s//</&lt;}"
+    s="${s//>/&gt;}"
+    printf '%s' "$s"
+}
+
+get_tooltip() {
+    local meta
+    meta="$(playerctl metadata --format '{{title}} — {{artist}}' 2>/dev/null || true)"
+    meta="${meta% — }"
+    if [[ -n "$meta" ]]; then
+        json_escape "$(pango_escape "$meta")"
+    else
+        printf 'Music panel'
+    fi
+}
+
 emit_idle() {
-    printf '{"text": "  ", "class": "music-idle", "alt": "idle", "tooltip": "Music panel"}\n'
+    printf '{"text": "", "class": "music-idle", "alt": "idle", "tooltip": "Music panel"}\n'
 }
 
 emit_idle
@@ -55,6 +83,7 @@ while true; do
         coproc CAVA { exec cava -p "$CONFIG" 2>/dev/null; }
         cava_pid="$CAVA_PID"
         last_check=$SECONDS
+        tip="$(get_tooltip)"
 
         while true; do
             if IFS= read -t 1 -r -u "${CAVA[0]}" line; then
@@ -68,10 +97,11 @@ while true; do
                 line="${line//5/▆}"
                 line="${line//6/▇}"
                 line="${line//7/█}"
-                printf '{"text": " %s ", "class": "music-viz", "alt": "playing", "tooltip": "Music panel"}\n' "$line"
+                printf '{"text": " <span letter_spacing=\x271800\x27 font_size=\x27small\x27>%s</span>", "class": "music-viz", "alt": "playing", "tooltip": "%s"}\n' "$line" "$tip"
                 if (( SECONDS - last_check >= 1 )); then
                     last_check=$SECONDS
                     is_playing || break
+                    tip="$(get_tooltip)"
                 fi
             else
                 rc=$?
@@ -80,6 +110,7 @@ while true; do
                 fi
                 last_check=$SECONDS
                 is_playing || break
+                tip="$(get_tooltip)"
             fi
         done
 
