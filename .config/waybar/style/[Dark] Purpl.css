@@ -8,6 +8,7 @@
 * {
   all: unset; /*this is really important to isolate waybar from gtk*/
   font: bold 14px "Iosevka Nerd Font Propo" ;
+  font-family: "Iosevka Nerd Font Propo", "JetBrainsMono Nerd Font", "Symbols Nerd Font";
    font-feature-settings: '"zero", "ss01", "ss02", "ss03", "ss04", "ss05", "cv31"';
   border: none;
   
@@ -173,4 +174,24 @@ tooltip label {
 #mpris{
  padding: 4px 4px;
   color: lighter(@main-color);
+}
+
+#custom-music {
+  font-family: "JetBrainsMono Nerd Font", "Iosevka Nerd Font Propo", monospace;
+  padding: 0px 6px;
+  margin: 4px 2px;
+  background: transparent;
+  color: lighter(@main-color);
+}
+
+#custom-music.music-idle {
+  color: alpha(lighter(@main-color), 0.75);
+}
+
+#custom-music.music-viz {
+  color: lighter(@main-color);
+}
+
+#custom-music:hover {
+  color: @color12;
 }

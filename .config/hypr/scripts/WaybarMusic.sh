@@ -35,7 +35,8 @@ cleanup() {
         cava_pid=""
     fi
 }
-trap cleanup EXIT INT TERM
+trap cleanup EXIT
+trap 'cleanup; exit 0' INT TERM
 
 is_playing() {
     playerctl -a status 2>/dev/null | grep -qx 'Playing'

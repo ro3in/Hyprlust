@@ -89,6 +89,26 @@ else
     SUDO_KEEPALIVE_PID=$!
 fi
 trap '[[ -n "${SUDO_KEEPALIVE_PID:-}" ]] && kill "$SUDO_KEEPALIVE_PID" 2>/dev/null || true' EXIT
+trap 'printf "\n" >&2; exit 130' INT
+trap 'printf "\n" >&2; exit 143' TERM
+
+# Check pacman's database lock before invoking pacman/makepkg/AUR helpers.
+# Removes stale locks left by crashed runs when no pacman process is alive;
+# aborts clearly if a live pacman instance holds the lock.
+ensure_pacman_unlocked() {
+    local lock="/var/lib/pacman/db.lck"
+    [[ -e "$lock" ]] || return 0
+    if pgrep -x pacman >/dev/null 2>&1; then
+        pgrep -a pacman >&2 || true
+        die "pacman is currently running (lock: $lock). Wait for it to finish and re-run."
+    fi
+    if (( DRY_RUN )); then
+        printf '  + remove stale pacman lock %s\n' "$lock"
+    else
+        warn "Removing stale pacman lock ($lock — no pacman process running)."
+        sudo rm -f "$lock" || die "Could not remove $lock."
+    fi
+}
 
 info "Arch-based system detected: $(. /etc/os-release && printf '%s' "${PRETTY_NAME:-unknown}")"
 (( DRY_RUN )) && warn "DRY RUN — nothing will be installed or modified."
@@ -285,14 +305,24 @@ FAILED_PKGS=()
 # missing or wrong `aur:` prefix in apps.list can never break a run — pacman
 # simply cannot find it, and the AUR helper picks it up.
 NOT_IN_REPO=()
+ensure_pacman_unlocked
 if (( DRY_RUN )); then
     run sudo pacman -Syu --needed --noconfirm "${PACMAN_PKGS[@]}"
 else
-    if ! sudo pacman -Syu --needed --noconfirm "${PACMAN_PKGS[@]}"; then
+    _pac_rc=0
+    sudo pacman -Syu --needed --noconfirm "${PACMAN_PKGS[@]}" || _pac_rc=$?
+    (( _pac_rc == 130 || _pac_rc == 143 )) && exit "$_pac_rc"
+    if (( _pac_rc != 0 )); then
+        ensure_pacman_unlocked
         warn "Bulk install failed — retrying package by package to isolate problems..."
         for pkg in "${PACMAN_PKGS[@]}"; do
-            sudo pacman -S --needed --noconfirm "$pkg" >/dev/null 2>&1 \
-                || FAILED_PKGS+=("$pkg")
+            _pkg_rc=0
+            sudo pacman -S --needed --noconfirm "$pkg" >/dev/null 2>&1 || _pkg_rc=$?
+            (( _pkg_rc == 130 || _pkg_rc == 143 )) && exit "$_pkg_rc"
+            if (( _pkg_rc != 0 )); then
+                ensure_pacman_unlocked
+                FAILED_PKGS+=("$pkg")
+            fi
         done
     fi
 fi
@@ -324,8 +354,9 @@ if (( ${#FAILED_PKGS[@]} > 0 )); then
     warn "These packages could not be installed:"
     printf '        %s\n' "${FAILED_PKGS[@]}"
     warn "The desktop may be missing features. Re-run this script after fixing them."
+else
+    ok "Official packages installed."
 fi
-ok "Official packages installed."
 
 # --- AUR helper -------------------------------------------------------------
 AUR_HELPER=""
@@ -340,6 +371,7 @@ else
         AUR_HELPER="yay"
     else
         _tmp="$(mktemp -d)"
+        ensure_pacman_unlocked
         if git clone --depth=1 https://aur.archlinux.org/yay-bin.git "$_tmp/yay-bin" \
             && ( cd "$_tmp/yay-bin" && makepkg -si --noconfirm ); then
             AUR_HELPER="yay"
@@ -364,16 +396,23 @@ if [[ -n "$AUR_HELPER" ]]; then
     esac
 
     if (( ${#AUR_PKGS[@]} > 0 )); then
+        ensure_pacman_unlocked
         # One helper invocation for every AUR package instead of one per
         # package — far fewer helper startups and prompt round-trips.
-        if run "$AUR_HELPER" -S --needed --noconfirm "${_aur_opts[@]}" "${AUR_PKGS[@]}" < /dev/null; then
+        _aur_rc=0
+        run "$AUR_HELPER" -S --needed --noconfirm "${_aur_opts[@]}" "${AUR_PKGS[@]}" < /dev/null || _aur_rc=$?
+        (( _aur_rc == 130 || _aur_rc == 143 )) && exit "$_aur_rc"
+        if (( _aur_rc == 0 )); then
             ok "AUR packages installed."
         else
+            ensure_pacman_unlocked
             warn "Batch AUR install failed — retrying package by package to isolate problems..."
             for pkg in "${AUR_PKGS[@]}"; do
-                if run "$AUR_HELPER" -S --needed --noconfirm "${_aur_opts[@]}" "$pkg" < /dev/null; then
-                    :
-                else
+                _pkg_rc=0
+                run "$AUR_HELPER" -S --needed --noconfirm "${_aur_opts[@]}" "$pkg" < /dev/null || _pkg_rc=$?
+                (( _pkg_rc == 130 || _pkg_rc == 143 )) && exit "$_pkg_rc"
+                if (( _pkg_rc != 0 )); then
+                    ensure_pacman_unlocked
                     warn "AUR package '$pkg' failed — continuing without it."
                 fi
             done

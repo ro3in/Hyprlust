@@ -71,8 +71,9 @@ Deliberately **not** bundled: browser profiles (`helium`, `chrome`, `firefox`),
 
 ## Music panel
 
-`SUPER + SHIFT + I` — or a click on the music icon in the top bar — opens a
-now-playing panel that hangs off the right end of the waybar:
+`SUPER + SHIFT + I` — or a click on the music module in the top bar (just left
+of the tray/audio group) — opens a now-playing panel that hangs off the right
+end of the waybar:
 
 - cover art in a seal/scallop frame, title, artist and album of whatever's playing
 - a grey "service chip" (Spotify, Helium/YouTube Music, …)
@@ -80,6 +81,9 @@ now-playing panel that hangs off the right end of the waybar:
   plain text, then to "no lyrics for this one")
 - squiggle progress bar with play/pause/previous/next and volume
 - colours taken from the current wallpaper, refreshed on every change
+- top-bar visualizer: `WaybarMusic.sh` streams an 8-bar `cava` visualizer
+  while an MPRIS player is playing (`music-viz`), and a music note when idle
+  (`music-idle`); persistent workspace 5 also uses a matching music icon
 
 It closes with `Escape`, the bar icon, `SUPER + SHIFT + I` again, or a click
 anywhere outside the card — there is no dimmed backdrop.
@@ -96,6 +100,7 @@ primary button, no tonal surfaces.
 | File | Purpose |
 |---|---|
 | `~/.config/quickshell/hyprlust-music/shell.qml` | the dock panel |
+| `~/.config/hypr/scripts/WaybarMusic.sh` | streaming waybar music-note / `cava` visualizer script |
 | `~/.local/bin/hyprlust-lyrics` | LRCLIB lookup, prints JSON |
 | `~/.local/bin/hyprlust-palette` | turns wallust's CSS into the panel's palette |
 | `~/.cache/hyprlust/colors.json` | generated palette (rewritten per wallpaper) |
@@ -109,6 +114,14 @@ registered:
 ```fish
 qs list --all
 qs ipc -c hyprlust-music show
+```
+
+If the bar icon/visualizer is missing and Waybar logs `Permission denied` for
+`WaybarMusic.sh`, ensure the script is executable (the installer sets `0755`
+automatically, as does git in this repo, though manual copies can lose `+x`):
+
+```fish
+chmod +x ~/.config/hypr/scripts/WaybarMusic.sh
 ```
 
 

@@ -22,11 +22,10 @@
   ],
 
   "modules-right": [
-  "custom/music",
-  "idle_inhibitor",
-  "group/demo",
-   "group/hub",
-   "custom/power",
-    
+    "idle_inhibitor",
+    "custom/music",
+    "group/demo",
+    "group/hub",
+    "custom/power",
   ],
 }
